@@ -14,6 +14,9 @@ What's New in v1.1.1
 
 This version makes Prism more customizable and more flexible to use.
 
+<<<<<<< HEAD
+For a list of new features go to the `Changelog <https://prism-pipeline.com/changelog/>`_
+=======
 Prism now supports "custom" plugins, which can be used to develop customizations of various features in Prism, while staying compatible with the official Prism updates.
 
 It is possible now to choose an installation directory for Prism. This makes it possible to use a single central installation of Prism on a server for the whole team. The prefences are now saved at a different location:
@@ -99,6 +102,7 @@ Prism can use now the "Filecache" node and the "Geometry" and "Alembic" node in 
 
 This Prism version contains more minor features, changes and bugfixes.
 For a detailed list of new features go to the `Changelog <https://prism-pipeline.com/changelog/>`_
+>>>>>>> 04853ed (docu fix)
 
 
 Supported Software
@@ -111,12 +115,21 @@ In the list below you can see, which DCC integrations are available on which OS 
 Integration     Windows   Linux   Mac OSX    Supported Versions
 ------------  ----------  ------  --------   --------------------------------------------
 ============  ==========  ======  ========   ============================================
+<<<<<<< HEAD
+3dsMax             X                           2017-2021 (with Python 2.7)
+Blender            X        X                  2.79-2.90
+Fusion             X                           9.02-16
+Houdini            X        X        X         16.0-18.5
+Maya               X        X        X         2016-2020 (earlier versions untested)
+Natron             X        X                  2.13-2.15  (earlier versions untested)
+=======
 3dsMax             X                           2017-2019
 Blender            X                           2.79
 Fusion             X                           9.02
 Houdini            X        X        X         16.0-17.0
 Maya               X        X        X         2016-2018 (earlier versions untested)
 Natron             X        X                  2.13-2.14  (earlier versions untested)
+>>>>>>> 04853ed (docu fix)
 Nuke               X        X        X         >10.0 (earlier versions unstable)
 Photoshop          X                           CS6, CC (earlier versions untested)
 Standalone         X        X        X
