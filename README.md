@@ -17,19 +17,11 @@ On the [website](https://prism-pipeline.com/) you can find the latest official i
 
 * To install the latest development version download or clone this repository and the Prism dependencies for your OS:
 
-<<<<<<< HEAD
-[Windows-dependencies](https://dl.dropboxusercontent.com/s/w6yj55g3x3m5qx4/Prism_v1.3.0.0_dependencies_win.zip?dl=1)
+[Windows-dependencies](https://dl.dropboxusercontent.com/s/p39sdnkmtgqxml1/Prism1.2.0_depependencies_Win.zip?dl=0)
 
-[Linux-dependencies](https://dl.dropboxusercontent.com/s/09nr64vk99gnd6u/Prism1.1.1_depependencies_Linux.zip?dl=0)
+[Linux-dependencies](https://dl.dropboxusercontent.com/s/0ivvj69dv5a62z9/Prism1.2.0_depependencies_Linux.zip?dl=0)
 
-[MacOSX-dependencies](https://dl.dropboxusercontent.com/s/f2jebuvq62xf1xq/Prism_v1.3.0.0_dependencies_mac.zip?dl=1)
-=======
-[Windows-dependencies](https://dl.dropboxusercontent.com/s/eiyg0uhagfjnktd/Prism1.1.1_depependencies_Win.zip?dl=0)
-
-[Linux-dependencies](https://dl.dropboxusercontent.com/s/09nr64vk99gnd6u/Prism1.1.1_depependencies_Linux.zip?dl=0)
-
-[MacOSX-dependencies](https://dl.dropboxusercontent.com/s/84aj0u8re4c14gh/Prism1.1.1_depependencies_Mac.zip?dl=0)
->>>>>>> eda7c34 (readme update)
+[MacOSX-dependencies](https://dl.dropboxusercontent.com/s/2ylt2z5anipks75/Prism1.2.0_depependencies_Mac.zip?dl=0)
 
 * Extract the dependencies and copy the extracted folders into Prism/PrismFiles of this repository.
 
