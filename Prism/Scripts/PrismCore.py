@@ -135,7 +135,6 @@ from PrismUtils import (
     Users,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -184,7 +183,7 @@ class PrismCore:
 
         try:
             # set some general variables
-            self.version = "v1.3.0.62"
+            self.version = "v1.3.0.52"
             self.requiredLibraries = "v1.3.0.0"
             self.core = self
 
@@ -417,7 +416,6 @@ class PrismCore:
         if self.uiAvailable:
             self.updater.startup()
 
-        self.callback(name="postInitialize")
         self.status = "loaded"
 
     @err_catcher(name=__name__)
@@ -2427,7 +2425,6 @@ License: GNU GPL-3.0-or-later<br>
 
     def writeErrorLog(self, text):
         try:
-            logger.debug(text)
             raiseError = False
             text += "\n\n"
 

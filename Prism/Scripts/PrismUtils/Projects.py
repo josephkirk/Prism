@@ -331,7 +331,7 @@ class Projects(object):
             projectConfig = self.core.prismIni
 
         prjUseLocal = self.core.getConfig("globals", "uselocalfiles", dft=False, configPath=projectConfig)
-        userUseLocal = self.core.getConfig("useLocalFiles", self.core.projectName, dft="inherit")
+        userUseLocal = self.core.getConfig("useLocalFiles", self.core.projectName)
         if userUseLocal == "inherit":
             useLocal = prjUseLocal
         elif userUseLocal == "on":
@@ -345,58 +345,28 @@ class Projects(object):
     def setRecentPrj(self, path, action="add"):
         path = self.core.fixPath(path)
 
-        recentProjects = self.getRecentProjects(includeCurrent=True)
-        if recentProjects and path == recentProjects[0]["configPath"] and action == "add":
+        pItems = self.core.getConfig(cat="recent_projects", dft=[]) or []
+        if pItems and path == pItems[0] and action == "add":
             return
 
-        newRecenetProjects = []
+        recentProjects = []
+        for pItem in pItems:
+            if not pItem:
+                continue
 
-        for prj in recentProjects:
-            if prj["configPath"] != path:
-                newRecenetProjects.append(prj)
+            if not self.core.isStr(pItem):
+                continue
 
+            recentProjects.append(self.core.fixPath(pItem))
+
+        recentProjects = [os.path.splitext(x)[0] + ".yml" for x in recentProjects]
+
+        if path in recentProjects:
+            recentProjects.remove(path)
         if action == "add":
-            prjData = {"configPath": path}
-            prjData["name"] = self.core.getConfig("globals", "project_name", configPath=path)
-            newRecenetProjects = [prjData] + newRecenetProjects
+            recentProjects = [path] + recentProjects
 
-        self.core.setConfig(param="recent_projects", val=newRecenetProjects)
-
-    @err_catcher(name=__name__)
-    def getRecentProjects(self, includeCurrent=False):
-        validProjects = []
-        deprecated = False
-        projects = self.core.getConfig("recent_projects", config="user", dft=[])
-
-        for project in projects:
-            if self.core.isStr(project):
-                if not project or not self.core.isStr(project):
-                    continue
-
-                if not includeCurrent and project == self.core.prismIni:
-                    continue
-
-                configPath = os.path.splitext(self.core.fixPath(project))[0] + self.core.configs.preferredExtension
-                prjData = {"configPath": configPath}
-                prjData["name"] = self.core.getConfig("globals", "project_name", configPath=configPath)
-                validProjects.append(prjData)
-                deprecated = True
-            else:
-                if not project or not project["configPath"]:
-                    continue
-
-                if not self.core.isStr(project["configPath"]):
-                    continue
-
-                if not includeCurrent and project["configPath"] == self.core.prismIni:
-                    continue
-
-                validProjects.append(project)
-
-        if deprecated:
-            self.core.setConfig(param="recent_projects", val=validProjects, config="user")
-
-        return validProjects
+        self.core.setConfig(param="recent_projects", val=recentProjects)
 
     @err_catcher(name=__name__)
     def createProjectDialog(self, name=None, path=None, settings={}):
