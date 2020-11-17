@@ -60,15 +60,30 @@ except:
     sys.path.append(modulePath)
     import P4
 
+class P4Connection:
+    connected = "Connected"
+    disconnected = "Disconnected"
+
+
 class Prism_Perforce_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
-        self._p4 = P4.P4()
+        self.p4 = P4.P4()
+
+        self.callbacks = []
+        self.registerCallbacks()
 
     @err_catcher(name=__name__)
     def isActive(self):
         return True
+
+    @err_catcher(name=__name__)
+    def registerCallbacks(self):
+        pass
+        # self.callbacks.append(self.core.registerCallback("projectBrowser_getAssetMenu", self.projectBrowser_getAssetMenu))
+        # self.callbacks.append(self.core.registerCallback("projectBrowser_getShotMenu", self.projectBrowser_getShotMenu))
+
 
     @err_catcher(name=__name__)
     def onProjectChanged(self, origin):
@@ -80,6 +95,7 @@ class Prism_Perforce_Functions(object):
 
     @err_catcher(name=__name__)
     def prismSettings_loadUI(self, origin):
+
         origin.gb_p4PrjIntegration = QGroupBox("Perforce Settings:")
         origin.w_Perforce = QWidget()
         lo_p4I = QHBoxLayout()
@@ -91,14 +107,14 @@ class Prism_Perforce_Functions(object):
         lo_p4 = QGridLayout()
         origin.w_Perforce.setLayout(lo_p4)
 
+        origin.l_p4Exec = QLabel("Perforce Executable:")
         origin.l_p4Site = QLabel("Perforce Port:")
         origin.l_p4PrjName = QLabel("Project Name:")
         origin.l_p4UserName = QLabel("User Name:")
         origin.l_p4WorkspaceName = QLabel("Workspace Name:")
         origin.l_p4Passwd = QLabel("User Password:")
-        origin.l_p4templateworkspacename = QLabel("Workspace Template Name:")
-        origin.l_p4defaultmapping = QLabel("Workspace Default Mapping:")
-        origin.l_p4defaultstream = QLabel("Workspace Default Stream:")
+        origin.l_p4Connection = QLabel("")
+        origin.e_p4exec = QLineEdit()
         origin.e_p4port = QLineEdit()
         origin.e_p4PrjName = QLineEdit()
         origin.e_p4UserName = QLineEdit()
@@ -108,30 +124,32 @@ class Prism_Perforce_Functions(object):
         origin.e_p4defaultmapping = QTextEdit()
         origin.e_p4defaultstream = QLineEdit()
 
-        origin.e_p4UserPassword.setEchoMode(QLineEdit.PasswordEchoOnEdit);
+        origin.bt_p4testconnection = QPushButton("Test Connection")
+        origin.e_p4UserPassword.setEchoMode(QLineEdit.PasswordEchoOnEdit)
 
         lo_p4.addWidget(origin.l_p4Site)
         lo_p4.addWidget(origin.l_p4PrjName)
         lo_p4.addWidget(origin.l_p4UserName)
         lo_p4.addWidget(origin.l_p4Passwd)
         lo_p4.addWidget(origin.l_p4WorkspaceName)
-        lo_p4.addWidget(origin.l_p4templateworkspacename)
-        lo_p4.addWidget(origin.l_p4defaultmapping)
-        lo_p4.addWidget(origin.l_p4defaultstream)
+        lo_p4.addWidget(origin.l_p4Exec)
+        lo_p4.addWidget(origin.l_p4Connection)
         lo_p4.addWidget(origin.e_p4port, 0, 1)
         lo_p4.addWidget(origin.e_p4PrjName, 1, 1)
         lo_p4.addWidget(origin.e_p4UserName, 2, 1)
         lo_p4.addWidget(origin.e_p4UserPassword, 3, 1)
         lo_p4.addWidget(origin.e_p4userworkspacename, 4, 1)
-        lo_p4.addWidget(origin.e_p4templateworkspacename, 5, 1)
-        lo_p4.addWidget(origin.e_p4defaultmapping, 6, 1)
-        lo_p4.addWidget(origin.e_p4defaultstream, 7, 1)
+        lo_p4.addWidget(origin.e_p4exec, 5, 1)
+        lo_p4.addWidget(origin.bt_p4testconnection, 6, 1)
 
         origin.w_prjSettings.layout().insertWidget(5, origin.gb_p4PrjIntegration)
         origin.groupboxes.append(origin.gb_p4PrjIntegration)
 
         origin.gb_p4PrjIntegration.toggled.connect(
             lambda x: self.prismSettings_p4Toggled(origin, x)
+        )
+        origin.bt_p4testconnection.clicked.connect(
+            lambda x: self.connectToPerforce()
         )
 
     @err_catcher(name=__name__)
@@ -144,7 +162,7 @@ class Prism_Perforce_Functions(object):
             "perforce", "active", configPath=self.core.prismIni
         )
         if p4:
-            p4Menu = QMenu("Perforce", origin)
+            p4Menu = QMenu("perforce", origin)
 
             actp4 = QAction("Open Perforce", origin)
             actp4.triggered.connect(self.openp4)
@@ -193,6 +211,11 @@ class Prism_Perforce_Functions(object):
             if "active" in settings["perforce"]:
                 origin.gb_p4PrjIntegration.setChecked(settings["perforce"]["active"])
 
+            if not "installpath" in settings["perforce"]:
+                settings["perforce"]["installpath"] = r"C:\ProgramFiles\Perforce"
+
+            origin.e_p4exec.setText(settings["perforce"]["installpath"])
+
             if "port" in settings["perforce"]:
                 origin.e_p4port.setText(settings["perforce"]["port"])
 
@@ -202,15 +225,6 @@ class Prism_Perforce_Functions(object):
 
             if "projectname" in settings["perforce"]:
                 origin.e_p4PrjName.setText(settings["perforce"]["projectname"])
-
-            if "templateworkspacename" in settings["perforce"]:
-                origin.e_p4templateworkspacename.setText(settings["perforce"]["templateworkspacename"])
-            
-            if "defaultworkspacemapping" in settings["perforce"]:
-                origin.e_p4defaultmapping.setText(settings["perforce"]["defaultworkspacemapping"])
-
-            if "defaultworkspacestream" in settings["perforce"]:
-                origin.e_p4defaultstream.setText(settings["perforce"]["defaultworkspacestream"])
 
         # self.prismSettings_spToggled(origin, origin.gb_p4PrjIntegration.isChecked())
 
@@ -234,16 +248,14 @@ class Prism_Perforce_Functions(object):
             settings["perforce"] = {}
 
         settings["perforce"]["active"] = origin.gb_p4PrjIntegration.isChecked()
+        settings["perforce"]["installpath"] = origin.e_p4exec.text()
         settings["perforce"]["port"] = origin.e_p4port.text()
         settings["perforce"]["projectname"] = origin.e_p4PrjName.text()
-        settings["perforce"]["templateworkspacename"] = origin.e_p4templateworkspacename.text()
-        settings["perforce"]["defaultworkspacemapping"] = origin.e_p4defaultmapping.toPlainText()
-        settings["perforce"]["defaultworkspacestream"] = origin.e_p4defaultstream.text()
 
     @err_catcher(name=__name__)
     def createAsset_open(self, origin):
         p4 = self.core.getConfig(
-            "Perforce", "active", configPath=self.core.prismIni
+            "perforce", "active", configPath=self.core.prismIni
         )
         if not p4:
             return
@@ -270,7 +282,7 @@ class Prism_Perforce_Functions(object):
     def editShot_open(self, origin, shotName):
         if shotName is None:
             p4 = self.core.getConfig(
-                "Perforce", "active", configPath=self.core.prismIni
+                "perforce", "active", configPath=self.core.prismIni
             )
             if not p4:
                 return
@@ -290,7 +302,7 @@ class Prism_Perforce_Functions(object):
     @err_catcher(name=__name__)
     def pbBrowser_getPublishMenu(self, origin):
         p4 = self.core.getConfig(
-            "Perforce", "active", configPath=self.core.prismIni
+            "perforce", "active", configPath=self.core.prismIni
         )
         if (
             p4
@@ -302,11 +314,37 @@ class Prism_Perforce_Functions(object):
 
     @err_catcher(name=__name__)
     def connectToPerforce(self, user=True):
-        pass
+        # if (
+        #     not hasattr(self, "p4")
+        #     or not hasattr(self, "sgPrjId")
+        #     or (user and not hasattr(self, "sgUserId"))
+        # ):
+        self.p4.port = self.core.getConfig("perforce", "port", configPath = self.core.prismIni)
+        self.p4.user = self.core.getConfig("perforce", "p4username")
+        self.p4.client = self.core.getConfig("perforce", "p4userworkspacename")
+        self.p4.password = self.core.getConfig("perforce", "p4userpassword")
+        if self.p4.connected():
+            self.p4.disconnect()
+        self.p4.connect()
+        try:
+            self.p4.run_login('-s')
+        except P4.P4Exception as why:
+            try:
+                self.p4.run_login()
+            except P4.P4Exception as why:
+                QMessageBox.error(self.core.messageParent, "Perforce Error", "Failed to login to p4. {}".format(why))
+        QMessageBox.information(self.core.messageParent, "Perforce", "Successfully connect to {} with user {}".format(self.p4.port, self.p4.user))
 
     @err_catcher(name=__name__)
     def createp4Assets(self, assets=[]):
-        pass
+        for asset in assets:
+            data = {
+                "p4path": ""
+            }
+            self.core.setConfig(
+                data=data, 
+                configPath=os.path.join(asset, "p4info.yml")
+                )
 
     @err_catcher(name=__name__)
     def createp4Shots(self, shots=[]):
