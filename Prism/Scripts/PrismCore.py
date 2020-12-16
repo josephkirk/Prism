@@ -135,6 +135,7 @@ from PrismUtils import (
     Users,
 )
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -183,7 +184,7 @@ class PrismCore:
 
         try:
             # set some general variables
-            self.version = "v1.3.0.52"
+            self.version = "v1.3.0.62"
             self.requiredLibraries = "v1.3.0.0"
             self.core = self
 
@@ -416,6 +417,7 @@ class PrismCore:
         if self.uiAvailable:
             self.updater.startup()
 
+        self.callback(name="postInitialize")
         self.status = "loaded"
 
     @err_catcher(name=__name__)
@@ -1100,9 +1102,9 @@ License: GNU GPL-3.0-or-later<br>
 
     @err_catcher(name=__name__)
     def setConfig(
-        self, cat=None, param=None, val=None, data=None, configPath=None, delete=False, config=None
+        self, cat=None, param=None, val=None, data=None, configPath=None, delete=False, config=None, location=None
     ):
-        return self.configs.setConfig(cat=cat, param=param, val=val, data=data, configPath=configPath, delete=delete, config=config)
+        return self.configs.setConfig(cat=cat, param=param, val=val, data=data, configPath=configPath, delete=delete, config=config, location=location)
 
     @err_catcher(name=__name__)
     def readYaml(self, path=None, data=None, stream=None):
@@ -1275,6 +1277,32 @@ License: GNU GPL-3.0-or-later<br>
             return True
         else:
             return False
+
+    @err_catcher(name=__name__)
+    def detectFileSequence(self, path):
+        pathDir = os.path.dirname(path)
+        regName = ""
+        seqFiles = []
+
+        for root, folders, files in os.walk(pathDir):
+            siblings = [os.path.join(root, f) for f in files]
+
+        for ch in re.escape(os.path.basename(path)):
+            if sys.version[0] == "2":
+                ch = unicode(ch)
+
+            if ch.isnumeric():
+                regName += "."
+            else:
+                regName += ch
+
+        r = re.compile(regName)
+
+        for sibling in siblings:
+            if r.match(os.path.basename(sibling)):
+                seqFiles.append(sibling)
+
+        return seqFiles
 
     @err_catcher(name=__name__)
     def getEntityBasePath(self, *args, **kwargs):
@@ -1998,6 +2026,20 @@ License: GNU GPL-3.0-or-later<br>
             logger.warning("failed to create shortcut: %s %s" % (link, result))
             return False
 
+    @err_catcher(name=__name__)
+    def createSymlink(self, link, target):
+        link = link.replace("/", "\\")
+        target = target.replace("/", "\\")
+
+        if os.path.exists(link):
+            os.remove(link)
+
+        if platform.system() == "Windows":
+            logger.debug("creating hardlink from: %s to %s" % (target, link))
+            subprocess.call(['mklink', "/H", link, target], shell=True)
+        else:
+            logger.warning("not implemented")
+
     @property
     @err_catcher(name=__name__)
     def timeMeasure(self):
@@ -2425,6 +2467,7 @@ License: GNU GPL-3.0-or-later<br>
 
     def writeErrorLog(self, text):
         try:
+            logger.debug(text)
             raiseError = False
             text += "\n\n"
 
