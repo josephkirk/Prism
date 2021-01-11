@@ -42,6 +42,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMaya as api
 import maya.OpenMayaUI as OpenMayaUI
+import pymel.core as pm
 
 try:
     import mtoa.aovs as maovs
@@ -58,6 +59,99 @@ except:
 
 from PrismUtils.Decorators import err_catcher as err_catcher
 
+
+def export_anim(root, exportPath, rootnode_name=None):
+    create_nodes = []
+    if rootnode_name:
+        try:
+            rootnode = pm.nt.Transform("DeformationSystem")
+        except:
+            rootnode = pm.nt.Transform(name="DeformationSystem")
+        create_nodes.append(rootnode)
+        export_node = rootnode
+
+    try:
+        targetjoint = root
+        target_name = targetjoint.namespace()
+        dupnode = targetjoint.duplicate()
+        dupjoint = dupnode[0]
+
+        if "MrsPuff" in target_name:
+            _rootnode = pm.nt.Transform(name="Group")
+            rootnode.setParent(_rootnode)
+            create_nodes.append(_rootnode)
+            export_node = _rootnode
+
+        # if "Carriage_Rigging:Carriage" in target_name:
+        #     rootnode = None
+        #     export_node = dupjoint
+        #     create_nodes.append(dupjoint)
+
+        dupjoint.setParent(rootnode)
+        targethi = [(i,t) for i,t in zip(targetjoint.getChildren(ad=True), dupjoint.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
+        targethi.append((targetjoint, dupjoint))
+        exportPath = os.path.abspath(os.path.join(exportPath,target_name.replace(":","_"))).replace("\\","/")+".fbx"
+        try:
+            pm.select(export_node, hi=True, r=True)
+            for i,t in targethi:
+                logging.info("Link {} to {}".format(i,t))
+                pm.parentConstraint(i, t)
+                i.sx >> t.sx
+                i.sy >> t.sy
+                i.sz >> t.sz
+                # for i in pm.listConnections(t,type="dagPose"):
+                #     pm.select(i.listConnections(type="skinCluster"),add=True)
+            
+            try:
+                if os.path.exists(exportPath):
+                    os.remove(exportPath)
+                os.makedirs(os.path.dirname(exportPath))
+            except:
+                pass
+            import maya.mel
+            pm.refresh() # Dump Maya , you Stupid AF
+            maya.mel.eval('FBXResetExport')
+            maya.mel.eval('FBXExportFileVersion -v FBX201600;')
+            maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|UnitsSelector" -v Centimeters;')
+            maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|DynamicScaleConversion" -v true;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation" -v 1;')
+            maya.mel.eval('FBXExportBakeComplexAnimation -v 1;')
+            maya.mel.eval('FBXExportBakeResampleAnimation -v 1;')
+            maya.mel.eval('FBXExportBakeComplexStep -v 1;')
+            maya.mel.eval('FBXExportQuaternion -v quaternion;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(pm.playbackOptions(q=True, ast=True)))
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(pm.playbackOptions(q=True, aet=True)))
+            maya.mel.eval('FBXExportConstraints -v 0;')
+            maya.mel.eval('FBXExportEmbeddedTextures -v 0;')
+            maya.mel.eval('FBXExportUpAxis z;')
+            maya.mel.eval('FBXExportSkins -v 1;')
+            maya.mel.eval('FBXExportSkeletonDefinitions -v 1;')
+            maya.mel.eval('FBXExportShapes -v 1;')
+            maya.mel.eval('FBXExportReferencedAssetsContent -v 1;')
+            maya.mel.eval('FBXExportInputConnections  -v 0;')
+            maya.mel.eval('FBXExportInAscii -v 1;')
+            maya.mel.eval('FBXExportApplyConstantKeyReducer -v 0;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|Deformation" -v 1;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|BindPose" -v 1;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|InputConnectionsGrp|IncludeChildren" -v 1;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|Geometry|Triangulate" -v 1;')
+            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|HideComplexAnimationBakedWarning" -v 1;')
+            maya.mel.eval('FBXExportSplitAnimationIntoTakes -c;')
+            # maya.mel.eval('FBXExportSplitAnimationIntoTakes -v \"Take001\" {} {}'.format(pm.playbackOptions(q=True, ast=True), pm.playbackOptions(q=True, aet=True)))
+            maya.mel.eval(("FBXExport -f \"{}\" -s;").format(exportPath))
+            # pm.refresh() # Dump Maya , you Stupid AF
+            # maya.mel.eval(("file -force -options \"fbx\" -typ \"FBX export\" -pr -es \"{}\"").format(exportPath))
+            # pm.FBXExport(exportPath, "-s")
+        except Exception as why:
+            logging.error("Export Failed.{}".format(why))
+            raise
+    finally:
+        for n in create_nodes:
+            try:
+                pm.delete(n)
+                # print(n)
+            except:
+                pass
 
 class Prism_Maya_Functions(object):
     def __init__(self, core, plugin):
@@ -740,7 +834,8 @@ class Prism_Maya_Functions(object):
             if origin.chb_wholeScene.isChecked():
                 mel.eval('FBXExport -f "%s"' % outputName.replace("\\", "\\\\"))
             else:
-                mel.eval('FBXExport -f "%s" -s' % outputName.replace("\\", "\\\\"))
+                for n in pm.selected():
+                    export_anim(n, outputName)
         elif expType == ".abc":
             try:
                 rootString = ""
