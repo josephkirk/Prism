@@ -76,17 +76,6 @@ def export_anim(root, exportPath, rootnode_name=None):
         dupnode = targetjoint.duplicate()
         dupjoint = dupnode[0]
 
-        if "MrsPuff" in target_name:
-            _rootnode = pm.nt.Transform(name="Group")
-            rootnode.setParent(_rootnode)
-            create_nodes.append(_rootnode)
-            export_node = _rootnode
-
-        # if "Carriage_Rigging:Carriage" in target_name:
-        #     rootnode = None
-        #     export_node = dupjoint
-        #     create_nodes.append(dupjoint)
-
         dupjoint.setParent(rootnode)
         targethi = [(i,t) for i,t in zip(targetjoint.getChildren(ad=True), dupjoint.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
         targethi.append((targetjoint, dupjoint))
