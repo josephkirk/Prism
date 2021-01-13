@@ -59,35 +59,50 @@ except:
 
 from PrismUtils.Decorators import err_catcher as err_catcher
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 def export_anim(root, exportPath, rootnode_name=None):
+
     create_nodes = []
-    if rootnode_name:
-        try:
-            rootnode = pm.nt.Transform("DeformationSystem")
-        except:
-            rootnode = pm.nt.Transform(name="DeformationSystem")
-        create_nodes.append(rootnode)
-        export_node = rootnode
+    rootnode = None
+    export_node = None
 
     try:
-        targetjoint = root
+        targetjoint = pm.PyNode(root)
+        targetParent = targetjoint.getParent()
+
+        if not rootnode_name and targetParent:
+            rootnode_name = targetParent.nodeName()
+
+        if rootnode_name:
+            rootnode = pm.nt.Transform(name=rootnode_name)
+            create_nodes.append(rootnode)
+            export_node = rootnode
+
         target_name = targetjoint.namespace()
         dupnode = targetjoint.duplicate()
         dupjoint = dupnode[0]
-
         dupjoint.setParent(rootnode)
+        try:
+            dupjoint.rename(targetjoint.nodeName())
+        except:
+            pass
         targethi = [(i,t) for i,t in zip(targetjoint.getChildren(ad=True), dupjoint.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
         targethi.append((targetjoint, dupjoint))
-        exportPath = os.path.abspath(os.path.join(exportPath,target_name.replace(":","_"))).replace("\\","/")+".fbx"
+        exportPath = os.path.abspath(os.path.join(exportPath,target_name.replace(":","_"))).replace("\\","/")
+        
+        if not export_node:
+            export_node = dupjoint
+            create_nodes.append(export_node)
         try:
             pm.select(export_node, hi=True, r=True)
             for i,t in targethi:
                 logging.info("Link {} to {}".format(i,t))
+                for atr in i.listAttr(k=True):
+                    atr >> t.attr(atr.longName())
                 pm.parentConstraint(i, t)
-                i.sx >> t.sx
-                i.sy >> t.sy
-                i.sz >> t.sz
+                    
                 # for i in pm.listConnections(t,type="dagPose"):
                 #     pm.select(i.listConnections(type="skinCluster"),add=True)
             
@@ -823,8 +838,9 @@ class Prism_Maya_Functions(object):
             if origin.chb_wholeScene.isChecked():
                 mel.eval('FBXExport -f "%s"' % outputName.replace("\\", "\\\\"))
             else:
-                for n in pm.selected():
-                    export_anim(n, outputName)
+                nodes = (n for i in pm.selected() for n in i.members() if issubclass(type(n), pm.nt.Transform))
+                for node in nodes:
+                    export_anim(node, outputName)
         elif expType == ".abc":
             try:
                 rootString = ""
