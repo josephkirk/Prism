@@ -100,6 +100,11 @@ class ImageRenderClass(object):
         if "Cam resolution" not in self.resolutionPresets:
             self.resolutionPresets.insert(0, "Cam resolution")
 
+        self.product_paths = self.core.paths.getRenderProductBasePaths()
+        self.cb_outPath.addItems(list(self.product_paths.keys()))
+        if len(self.product_paths) < 2:
+            self.w_outPath.setVisible(False)
+
         self.outputFormats = [
             ".exr",
             ".png",
@@ -157,7 +162,6 @@ class ImageRenderClass(object):
         self.b_changeTask.setStyleSheet(
             "QPushButton { background-color: rgb(150,0,0); border: none;}"
         )
-        self.f_localOutput.setVisible(self.core.useLocalFiles)
         self.e_osSlaves.setText("All")
 
         if stateData is not None:
@@ -242,8 +246,10 @@ class ImageRenderClass(object):
             idx = self.cb_take.findText(data["take"])
             if idx != -1:
                 self.cb_take.setCurrentIndex(idx)
-        if "localoutput" in data:
-            self.chb_localOutput.setChecked(eval(data["localoutput"]))
+        if "curoutputpath" in data:
+            idx = self.cb_outPath.findText(data["curoutputpath"])
+            if idx != -1:
+                self.cb_outPath.setCurrentIndex(idx)
         if "outputFormat" in data:
             idx = self.cb_format.findText(data["outputFormat"])
             if idx != -1:
@@ -269,6 +275,8 @@ class ImageRenderClass(object):
             self.chb_rjSuspended.setChecked(eval(data["rjsuspended"]))
         if "rjRenderNSIs" in data:
             self.chb_rjNSIs.setChecked(eval(data["rjRenderNSIs"]))
+        if "rjRenderRS" in data:
+            self.chb_rjRS.setChecked(eval(data["rjRenderRS"]))
         if "osdependencies" in data:
             self.chb_osDependencies.setChecked(eval(data["osdependencies"]))
         if "osupload" in data:
@@ -345,7 +353,7 @@ class ImageRenderClass(object):
         self.b_resPresets.clicked.connect(self.showResPresets)
         self.chb_useTake.stateChanged.connect(self.useTakeChanged)
         self.cb_take.activated.connect(self.stateManager.saveStatesToScene)
-        self.chb_localOutput.stateChanged.connect(self.stateManager.saveStatesToScene)
+        self.cb_outPath.activated[str].connect(self.stateManager.saveStatesToScene)
         self.cb_format.activated.connect(self.stateManager.saveStatesToScene)
         self.cb_renderer.currentIndexChanged[str].connect(self.rendererChanged)
         self.gb_submit.toggled.connect(self.rjToggled)
@@ -357,6 +365,7 @@ class ImageRenderClass(object):
         self.sp_rjTimeout.editingFinished.connect(self.stateManager.saveStatesToScene)
         self.chb_rjSuspended.stateChanged.connect(self.stateManager.saveStatesToScene)
         self.chb_rjNSIs.stateChanged.connect(self.stateManager.saveStatesToScene)
+        self.chb_rjRS.stateChanged.connect(self.stateManager.saveStatesToScene)
         self.chb_osDependencies.stateChanged.connect(
             self.stateManager.saveStatesToScene
         )
@@ -652,6 +661,7 @@ class ImageRenderClass(object):
             self.cb_take.setCurrentIndex(idx)
 
         self.updateRange()
+        self.managerChanged()
         self.refreshPasses()
 
         if self.cb_manager.currentText() in self.core.rfManagers:
@@ -777,33 +787,18 @@ class ImageRenderClass(object):
 
     @err_catcher(name=__name__)
     def rjToggled(self, checked):
-        self.f_localOutput.setEnabled(
-            self.gb_submit.isHidden()
-            or not checked
-            or (
-                checked
-                and self.core.rfManagers[self.cb_manager.currentText()].canOutputLocal
-            )
-        )
         self.stateManager.saveStatesToScene()
 
     @err_catcher(name=__name__)
     def managerChanged(self, text=None):
         rfm = self.cb_manager.currentText()
-        self.f_localOutput.setEnabled(
-            self.gb_submit.isHidden()
-            or not self.gb_submit.isChecked()
-            or (
-                self.gb_submit.isChecked()
-                and self.core.rfManagers[rfm].canOutputLocal
-            )
-        )
-
         if rfm in self.core.rfManagers:
             self.core.rfManagers[rfm].sm_houRender_managerChanged(self)
 
         is3dl = self.node and (self.node.type().name() == "3Delight")
+        isRedshift = self.node and (self.node.type().name() == "Redshift_ROP")
         self.w_renderNSIs.setVisible(bool(is3dl and (rfm == "Deadline")))
+        self.w_renderRS.setVisible(bool(isRedshift and (rfm == "Deadline")) and self.core.debugMode)
 
         self.stateManager.saveStatesToScene()
 
@@ -1001,88 +996,34 @@ class ImageRenderClass(object):
         if self.l_taskName.text() == "":
             return
 
+        task = self.l_taskName.text()
+        extension = self.cb_format.currentText()
         fileName = self.core.getCurrentFileName()
-
-        if self.core.useLocalFiles:
-            if self.chb_localOutput.isChecked() and (
-                self.gb_submit.isHidden()
-                or not self.gb_submit.isChecked()
-                or (
-                    self.gb_submit.isChecked()
-                    and self.core.rfManagers[
-                        self.cb_manager.currentText()
-                    ].canOutputLocal
-                )
-            ):
-                fileName = self.core.convertPath(fileName, target="local")
-            else:
-                fileName = self.core.convertPath(fileName, target="global")
-
-        hVersion = ""
-        if useVersion != "next":
-            hVersion = useVersion.split(self.core.filenameSeparator)[0]
-            pComment = useVersion.split(self.core.filenameSeparator)[1]
-
         fnameData = self.core.getScenefileData(fileName)
         framePadding = ".$F4" if self.cb_rangeType.currentText() != "Single Frame" else ""
-        if fnameData["entity"] == "shot":
-            outputPath = os.path.join(
-                self.core.getEntityBasePath(fileName),
-                "Rendering",
-                "3dRender",
-                self.l_taskName.text(),
-            )
-            if hVersion == "":
-                hVersion = self.core.getHighestTaskVersion(outputPath)
-                pComment = fnameData["comment"]
+        location = self.cb_outPath.currentText()
 
-            outputPath = os.path.join(
-                outputPath, hVersion + self.core.filenameSeparator + pComment, "beauty"
-            )
-            outputFile = os.path.join(
-                "shot"
-                + self.core.filenameSeparator
-                + fnameData["entityName"]
-                + self.core.filenameSeparator
-                + self.l_taskName.text()
-                + self.core.filenameSeparator
-                + hVersion
-                + self.core.filenameSeparator
-                + "beauty"
-                + framePadding
-                + self.cb_format.currentText()
-            )
-        elif fnameData["entity"] == "asset":
-            outputPath = os.path.join(
-                self.core.getEntityBasePath(fileName),
-                "Rendering",
-                "3dRender",
-                self.l_taskName.text(),
-            )
-            if hVersion == "":
-                hVersion = self.core.getHighestTaskVersion(outputPath)
-                pComment = fnameData["comment"]
-
-            outputPath = os.path.join(
-                outputPath, hVersion + self.core.filenameSeparator + pComment, "beauty"
-            )
-            outputFile = os.path.join(
-                fnameData["entityName"]
-                + self.core.filenameSeparator
-                + self.l_taskName.text()
-                + self.core.filenameSeparator
-                + hVersion
-                + self.core.filenameSeparator
-                + "beauty"
-                + framePadding
-                + self.cb_format.currentText()
-            )
+        if fnameData["entity"] == "asset":
+            assetPath = self.core.getEntityBasePath(fileName)
+            entityName = self.core.entities.getAssetRelPathFromPath(assetPath)
         else:
-            return
+            entityName = fnameData["entityName"]
 
-        outputName = os.path.join(outputPath, outputFile)
+        outputPath = self.core.mediaProducts.generateMediaProductPath(
+            entity=fnameData["entity"],
+            entityName=entityName,
+            task=task,
+            extension=extension,
+            framePadding=framePadding,
+            comment=fnameData["comment"],
+            version=useVersion if useVersion != "next" else None,
+            location=location
+        )
 
-        return outputName.replace("\\", "/"), outputPath.replace("\\", "/"), hVersion
+        outputFolder = os.path.dirname(outputPath)
+        hVersion = self.core.mediaProducts.getVersionFromFilepath(outputPath)
+
+        return outputPath, outputFolder, hVersion
 
     @err_catcher(name=__name__)
     def executeState(self, parent, useVersion="next"):
@@ -1208,7 +1149,6 @@ class ImageRenderClass(object):
             "settings": rSettings,
         }
         self.core.callback("preRender", **kwargs)
-
         if not self.gb_submit.isHidden() and self.gb_submit.isChecked():
             result = self.core.rfManagers[
                 self.cb_manager.currentText()
@@ -1331,7 +1271,7 @@ class ImageRenderClass(object):
             ),
             "usetake": str(self.chb_useTake.isChecked()),
             "take": self.cb_take.currentText(),
-            "localoutput": str(self.chb_localOutput.isChecked()),
+            "curoutputpath": self.cb_outPath.currentText(),
             "outputFormat": self.cb_format.currentText(),
             "connectednode": curNode,
             "connectednode2": curNode2,
@@ -1343,6 +1283,7 @@ class ImageRenderClass(object):
             "rjtimeout": self.sp_rjTimeout.value(),
             "rjsuspended": str(self.chb_rjSuspended.isChecked()),
             "rjRenderNSIs": str(self.chb_rjNSIs.isChecked()),
+            "rjRenderRS": str(self.chb_rjRS.isChecked()),
             "osdependencies": str(self.chb_osDependencies.isChecked()),
             "osupload": str(self.chb_osUpload.isChecked()),
             "ospassets": str(self.chb_osPAssets.isChecked()),

@@ -96,13 +96,13 @@ class Products(object):
 
     @err_catcher(name=__name__)
     def getLocationPathFromLocation(self, location):
-        locDict = self.core.getExportPaths()
+        locDict = self.core.paths.getExportProductBasePaths()
         if location in locDict:
             return locDict[location]
 
     @err_catcher(name=__name__)
     def getLocationFromFilepath(self, path):
-        locDict = self.core.getExportPaths()
+        locDict = self.core.paths.getExportProductBasePaths()
         nPath = os.path.normpath(path)
         for location in locDict:
             if nPath.startswith(locDict[location]):
@@ -136,13 +136,48 @@ class Products(object):
         return versionFolder
 
     @err_catcher(name=__name__)
+    def isVersionFolderName(self, name):
+        nameData = name.split(self.core.filenameSeparator)
+        isValid = len(nameData) == 3 and name[0] == "v"
+        return isValid
+
+    @err_catcher(name=__name__)
+    def getDataFromVersionName(self, versionName):
+        if not self.core.products.isVersionFolderName(versionName):
+            return {}
+
+        versionName, comment, user = versionName.split(self.core.filenameSeparator)
+        data = {
+            "version": versionName,
+            "comment": comment,
+            "user": user,
+        }
+        return data
+
+    @err_catcher(name=__name__)
+    def getProductDataFromFilepath(self, filepath):
+        filepath = os.path.normpath(filepath)
+        if os.path.splitext(filepath)[1]:
+            productDir = os.path.dirname(filepath)
+        else:
+            productDir = filepath
+
+        cacheData = {}
+        cacheData["unit"] = os.path.basename(productDir)
+        versionName = os.path.basename(os.path.dirname(productDir))
+        cacheData.update(self.getDataFromVersionName(versionName))
+        taskPath = os.path.dirname(os.path.dirname(productDir))
+        cacheData["task"] = os.path.basename(taskPath)
+        cacheData["extension"] = os.path.splitext(filepath)[1]
+        return cacheData
+
+    @err_catcher(name=__name__)
     def getVersionsFromPath(self, path):
         versions = {}
         versionPaths = []
         for root, folders, files in os.walk(path):
             for folder in folders:
-                nameData = folder.split(self.core.filenameSeparator)
-                isVersion = len(nameData) == 3 and folder[0] == "v"
+                isVersion = self.isVersionFolderName(folder)
                 isMaster = folder == "master"
                 if not isVersion and not isMaster:
                     continue
@@ -302,13 +337,17 @@ class Products(object):
         return sorted(units)
 
     @err_catcher(name=__name__)
-    def getProductPathFromEntity(self, entity, entityName, task):
+    def getProductPathFromEntity(self, entity, entityName, task=None, location="global"):
         if entity == "asset":
-            entityPath = os.path.join(self.core.assetPath, entityName)
+            entityPath = self.core.getEntityPath(asset=entityName, location=location)
         elif entity == "shot":
-            entityPath = os.path.join(self.core.shotPath, entityName)
+            entityPath = self.core.getEntityPath(shot=entityName, location=location)
 
-        productPath = os.path.join(entityPath, "Export", task)
+        productPath = self.getProductPathFromEntityPath(entityPath)
+
+        if task is not None:
+            productPath = os.path.join(productPath, task)
+
         return productPath
 
     @err_catcher(name=__name__)
@@ -350,10 +389,10 @@ class Products(object):
         filename = self.generateProductFilename(entity, entityName, task, hVersion, framePadding, extension)
         outputName = os.path.join(outputPath, filename)
 
-        basePath = self.core.getExportPaths()[location]
+        basePath = self.core.paths.getExportProductBasePaths()[location]
         prjPath = os.path.normpath(self.core.projectPath)
         basePath = os.path.normpath(basePath)
-        outputName = outputName.replace(prjPath, basePath)
+        outputName = os.path.normpath(outputName).replace(prjPath, basePath)
         return outputName
 
     @err_catcher(name=__name__)
@@ -385,6 +424,10 @@ class Products(object):
             )
 
         return outputName
+
+    @err_catcher(name=__name__)
+    def getVersionInfoPathFromProductFilepath(self, filepath):
+        return os.path.dirname(os.path.dirname(filepath))
 
     @err_catcher(name=__name__)
     def updateMasterVersion(self, path):

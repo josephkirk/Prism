@@ -489,6 +489,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
         )(self, listWidget, inactive, inactivef, activef)
 
         self.activeList = listWidget
+        self.activeList.setFocus()
 
     @err_catcher(name=__name__)
     def focusImport(self, event):
@@ -952,7 +953,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
         cb.setText(stateStr)
 
     @err_catcher(name=__name__)
-    def deleteState(self, state=None):
+    def deleteState(self, state=None, **kwargs):
         if state is None:
             item = self.activeList.currentItem()
         else:
@@ -964,7 +965,10 @@ class %s(QWidget, %s.%s, %s.%sClass):
         for i in range(item.childCount()):
             self.deleteState(item.child(i))
 
-        getattr(item.ui, "preDelete", lambda item: None)(item=item)
+        delKwargs = {"item": item}
+        delKwargs.update(kwargs)
+
+        getattr(item.ui, "preDelete", lambda **kwargs: None)(**delKwargs)
 
         # self.states.remove(item) #buggy in qt 4
 
@@ -1043,7 +1047,8 @@ class %s(QWidget, %s.%s, %s.%sClass):
             else:
                 parent = None
 
-            self.createState("Export", parent=parent)
+            stateType = getattr(self.core.appPlugin, "getPreferredStateType", lambda x: x)("Export")
+            self.createState(stateType, parent=parent)
             self.setListActive(self.tw_export)
 
         elif stateType == "Render":
@@ -1510,7 +1515,12 @@ class %s(QWidget, %s.%s, %s.%sClass):
 
     @err_catcher(name=__name__)
     def publish(
-        self, executeState=False, continuePublish=False, useVersion="next", states=None
+        self,
+        executeState=False,
+        continuePublish=False,
+        useVersion="next",
+        states=None,
+        successPopup=True,
     ):
         if self.publishPaused and not continuePublish:
             return
@@ -1870,8 +1880,9 @@ class %s(QWidget, %s.%s, %s.%sClass):
             pass
 
         if success:
-            msgStr = "The %s was successful." % actionString2
-            self.core.popup(msgStr, title=actionString, severity="info")
+            if successPopup:
+                msgStr = "The %s was successful." % actionString2
+                self.core.popup(msgStr, title=actionString, severity="info")
         else:
             infoString = ""
             for i in self.publishResult:

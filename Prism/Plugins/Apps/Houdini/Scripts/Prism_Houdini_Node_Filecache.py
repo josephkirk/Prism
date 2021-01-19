@@ -54,6 +54,10 @@ class Prism_Houdini_Filecache(object):
         self.core = self.plugin.core
 
     @err_catcher(name=__name__)
+    def getTypeName(self):
+        return "prism::Filecache"
+
+    @err_catcher(name=__name__)
     def getFormats(self):
         blacklisted = [".hda", "ShotCam", "other", ".rs"]
         appFormats = self.core.appPlugin.outputFormats
@@ -98,8 +102,14 @@ class Prism_Houdini_Filecache(object):
         state = self.getStateFromNode(kwargs)
         task = state.ui.getTaskname()
         kwargs["node"].parm("task").set(task)
+        state.ui.setRangeType("Node")
         state.ui.setOutputType(kwargs["node"].parm("format").evalAsString())
         kwargs["node"].setColor(hou.Color(0.95, 0.5, 0.05))
+        kwargs["node"].parm("_init").set(1)
+
+    @err_catcher(name=__name__)
+    def onNodeDeleted(self, kwargs):
+        self.plugin.onNodeDeleted(kwargs)
 
     @err_catcher(name=__name__)
     def getStateFromNode(self, kwargs):
@@ -111,15 +121,25 @@ class Prism_Houdini_Filecache(object):
         state.ui.setTaskname(kwargs["script_value"])
 
     @err_catcher(name=__name__)
+    def setFormatFromNode(self, kwargs):
+        state = self.getStateFromNode(kwargs)
+        state.ui.setOutputType(kwargs["script_value"])
+
+    @err_catcher(name=__name__)
     def showInStateManagerFromNode(self, kwargs):
         self.plugin.showInStateManagerFromNode(kwargs)
 
     @err_catcher(name=__name__)
     def openInExplorerFromNode(self, kwargs):
-        self.plugin.openInExplorerFromNode(kwargs)
+        state = self.getStateFromNode(kwargs)
+        folderpath = state.ui.l_pathLast.text()
+        self.core.openFolder(folderpath)
 
     @err_catcher(name=__name__)
     def refreshNodeUi(self, node, state):
+        if not node.parm("_init").eval():
+            return
+
         taskname = state.getTaskname()
         self.plugin.setNodeParm(node, "task", taskname, clear=True)
         rangeType = state.getRangeType()
@@ -145,10 +165,68 @@ class Prism_Houdini_Filecache(object):
 
         rop = node.node(ropName)
         rop.parm("execute").pressButton()
+        QCoreApplication.processEvents()
+        self.core.popup("Finished caching successfully.", severity="info", modal=False)
 
     @err_catcher(name=__name__)
     def executePressed(self, kwargs):
         sm = self.core.getStateManager()
         state = self.getStateFromNode(kwargs)
-        version = kwargs["node"].parm("version").evalAsString()
-        sm.publish(executeState=True, useVersion=version, states=[state])
+        version = self.getWriteVersionFromNode(kwargs["node"])
+        sm.publish(executeState=True, useVersion=version, states=[state], successPopup=False)
+
+    @err_catcher(name=__name__)
+    def getWriteVersionFromNode(self, node):
+        if node.parm("nextVersionWrite").eval():
+            version = "next"
+        else:
+            version = node.parm("writeVersion").evalAsString()
+
+        return version
+
+    @err_catcher(name=__name__)
+    def getParentFolder(self, create=True):
+        sm = self.core.getStateManager()
+        for state in sm.states:
+            if state.ui.listType != "Export" or state.ui.className != "Folder":
+                continue
+
+            if state.ui.e_name.text() != "Filecaches":
+                continue
+
+            return state
+
+        if create:
+            stateData = {
+                "statename": "Filecaches",
+                "listtype": "Export",
+                "stateenabled": "PySide2.QtCore.Qt.CheckState.Checked",
+                "stateexpanded": False,
+            }
+            state = sm.createState("Folder", stateData=stateData)
+            return state
+
+    @err_catcher(name=__name__)
+    def findExistingVersion(self, kwargs, mode):
+        version = 3
+
+        import TaskSelection
+
+        ts = TaskSelection.TaskSelection(core=self.core)
+        widget = ts.tw_versions
+        self.core.parentWindow(widget)
+        widget.setWindowTitle("Select Version")
+        widget.resize(1000, 600)
+        widget.show()
+
+        if not ts.productPath:
+            return
+
+        if mode == "write":
+            kwargs["node"].parm("nextVersionWrite").set(0)
+            kwargs["node"].parm("writeVersion").set(version)
+        elif mode == "read":
+            kwargs["node"].parm("latestVersionRead").set(0)
+            kwargs["node"].parm("readVersion").set(version)
+
+        return version
