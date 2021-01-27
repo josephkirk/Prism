@@ -1,0 +1,262 @@
+# Query: self.core.callback
+# Including: ./Prism/Scripts
+# ContextLines: 1
+
+60 results - 17 files
+
+Prism\Scripts\CreateProject.py:
+  97          self.setupFolders()
+  98:         self.core.callback(
+  99              name="onCreateProjectOpen",
+
+Prism\Scripts\PrismSettings.py:
+  134  
+  135:         self.core.callback(
+  136              name="onPrismSettingsOpen", types=["curApp", "custom"], args=[self]
+
+  381  
+  382:         self.core.callback(name="prismSettings_saveSettings", types=["curApp", "unloadedApps", "custom", "prjManagers"], args=[self, cData])
+  383  
+
+  415  
+  416:             self.core.callback(name="prismSettings_savePrjSettings", types=["curApp", "unloadedApps", "custom", "prjManagers"], args=[self, cData])
+  417              changeProject = cData["changeProject"]
+
+  530  
+  531:         self.core.callback(name="onPrismSettingsSave", types=["custom"], args=[self])
+  532  
+
+  584          configData = self.core.getConfig()
+  585:         self.core.callback(name="prismSettings_loadSettings", types=["curApp", "unloadedApps", "custom", "prjManagers"], args=[self, configData])
+  586  
+
+  687              configData = self.core.getConfig(configPath=self.core.prismIni)
+  688:             self.core.callback(name="prismSettings_loadPrjSettings", types=["curApp", "unloadedApps", "custom", "prjManagers"], args=[self, configData])
+  689              gblData = configData.get("globals", {})
+
+  876  
+  877:         self.core.callback(name="prismSettings_loadUI", types=["custom", "prjManagers"], args=[self])
+  878  
+
+Prism\Scripts\PrismTray.py:
+  194  
+  195:                 self.core.callback(
+  196                      name="openTrayContextMenu",
+
+Prism\Scripts\SaveComment.py:
+   66          self.setEmptyPreview()
+   67:         self.core.callback(
+   68              name="onSaveExtendedOpen", types=["curApp", "custom"], args=[self]
+
+  109          }
+  110:         self.core.callback(
+  111              name="onGetSaveExtendedDetails",
+
+Prism\Scripts\SetProject.py:
+  108          getattr(self.core.appPlugin, "setProject_loading", lambda x: None)(self)
+  109:         self.core.callback(
+  110              name="onSetProjectStartup", types=["prjManagers", "custom"], args=[self]
+
+Prism\Scripts\PrismUtils\Integration.py:
+  174          if result:
+  175:             self.core.callback("postIntegrationAdded", args=(app, path))
+  176              path = self.core.fixPath(path)
+
+Prism\Scripts\PrismUtils\MediaProducts.py:
+  403  
+  404:         result = self.core.callback(name="sm_render_fixOutputPath", types=["custom"], args=[self, outputName])
+  405          for res in result:
+
+Prism\Scripts\PrismUtils\ProjectEntities.py:
+   384          if not existed:
+   385:             self.core.callback(
+   386                  name="onAssetFolderCreated",
+
+   415          if not existed:
+   416:             self.core.callback(
+   417                  name="onAssetCreated",
+
+   456  
+   457:             self.core.callback(
+   458                  name="onShotCreated", types=["custom"], args=[self, seqName, shotName]
+
+   506  
+   507:         self.core.callback(
+   508              name="onStepCreated",
+
+   555              else:
+   556:                 self.core.callback(
+   557                      name="onCategoryCreated",
+
+  1241  
+  1242:         self.core.callback(
+  1243              name="onEmptySceneCreated",
+
+Prism\Scripts\PrismUtils\Projects.py:
+  268  
+  269:         self.core.callbacks.registerProjectHooks()
+  270  
+
+  308          self.core.checkCommands()
+  309:         self.core.callback(
+  310              name="onProjectChanged",
+
+  609          self.core.setConfig(data=cData, configPath=configPath)
+  610:         self.core.callback(
+  611              name="onProjectCreated",
+
+Prism\Scripts\ProjectScripts\DependencyViewer.py:
+  106  
+  107:         self.core.callback(
+  108              name="onDependencyViewerOpen", types=["curApp", "custom"], args=[self]
+
+Prism\Scripts\ProjectScripts\ProjectBrowser.py:
+   225          self.connectEvents()
+   226:         self.core.callback(
+   227              name="onProjectBrowserStartup", types=["curApp", "custom"], args=[self]
+
+   650  
+   651:         self.core.callback(
+   652              name="projectBrowser_loadUI", types=["custom", "unloadedApps"], args=[self]
+
+   809  
+   810:         self.core.callback(
+   811              name="onProjectBrowserClose", types=["curApp", "custom", "prjManagers"], args=[self]
+
+   942  
+   943:         self.core.callback(name="onProjectBrowserRefreshUI", args=[self])
+   944          self.setEnabled(True)
+
+  1275          menu = self.getContextMenu(menuType, **kwargs)
+  1276:         self.core.callback(
+  1277              name="projectBrowserContextMenuRequested",
+
+  1517                  args = [self, iname, cItem.text(1).replace(self.aBasePath, "")[1:], cItem.text(2)]
+  1518:                 cmenu = self.core.callback(name="projectBrowser_getAssetMenu", args=args)
+  1519                  if cmenu:
+
+  1544                      args = [self, iname]
+  1545:                     cmenu = self.core.callback(name="projectBrowser_getShotMenu", args=args)
+  1546                      if cmenu:
+
+  1598          if callbackName:
+  1599:             self.core.callback(
+  1600                  name=callbackName,
+
+  1724  
+  1725:         self.core.callback(
+  1726              name="openPBFileContextMenu", types=["custom"], args=[self, rcmenu, idx]
+
+  1817  
+  1818:         self.core.callback(name="onSceneOpen", types=["custom"], args=[self, filepath])
+  1819  
+
+  2010              if ext in self.core.appPlugin.sceneFormats and openFile:
+  2011:                 self.core.callback(
+  2012                      name="preLoadEmptyScene",
+
+  2016                  self.exeFile(filepath=filePath)
+  2017:                 self.core.callback(
+  2018                      name="postLoadEmptyScene",
+
+  2136  
+  2137:         self.core.callback(name="onStepDlgOpen", types=["custom"], args=[self, self.ss])
+  2138  
+
+  3009  
+  3010:         result = self.core.callback(
+  3011              name="onShotDlgOpen", types=["custom"], args=[self, self.es, shotName]
+
+  3312          if tab == "ah":
+  3313:             self.core.callback(
+  3314                  name="onAssetDlgOpen", types=["custom"], args=[self, self.newItem]
+
+  3316          elif tab in ["ac", "sc"]:
+  3317:             self.core.callback(
+  3318                  name="onCategroyDlgOpen", types=["custom"], args=[self, self.newItem]
+
+  4680  
+  4681:         self.core.callback(
+  4682              name="openPBListContextMenu",
+
+Prism\Scripts\ProjectScripts\StateManager.py:
+   188  
+   189:         self.core.callback(
+   190              name="onStateManagerOpen", types=["curApp", "custom"], args=[self]
+
+   640      def closeEvent(self, event):
+   641:         self.core.callback(name="onStateManagerClose", types=["custom"], args=[self])
+   642          event.accept()
+
+   882  
+   883:         self.core.callback(name="onStateCreated", types=["custom"], args=[self, item.ui], **{"stateData": stateData})
+   884  
+
+  1002  
+  1003:         self.core.callback(name="onStateDeleted", types=["custom"], args=[self, item.ui])
+  1004  
+
+  1193  
+  1194:         self.core.callback("onStateManagerShow", args=[self])
+  1195  
+
+  1803              getattr(self.core.appPlugin, "sm_preExecute", lambda x: None)(self)
+  1804:             self.core.callback(name="onPublish", types=["custom"], args=[self])
+  1805  
+
+  1863          pubType = "stateExecution" if executeState else "publish"
+  1864:         self.core.callback(name="postPublish", types=["custom"], args=[self, pubType], **{"result": self.publishResult})
+  1865  
+
+Prism\Scripts\ProjectScripts\TaskSelection.py:
+  101  
+  102:         self.core.callback(
+  103              name="onSelectTaskOpen", types=["curApp", "custom"], args=[self]
+
+  456  
+  457:         self.core.callback("productSelectorContextMenuRequested", args=[self, viewUi, pos, rcmenu])
+  458          rcmenu.exec_((viewUi.viewport()).mapToGlobal(pos))
+
+Prism\Scripts\ProjectScripts\StateManagerNodes\default_Export.py:
+  642  
+  643:             result = self.core.callback("preExport", **kwargs)
+  644  
+
+  676  
+  677:             result = self.core.callback("postExport", **kwargs)
+  678  
+
+  730  
+  731:             result = self.core.callback("preExport", **kwargs)
+  732  
+
+  793  
+  794:             result = self.core.callback("postExport", **kwargs)
+  795  
+
+Prism\Scripts\ProjectScripts\StateManagerNodes\default_ImageRender.py:
+  946  
+  947:             self.core.callback("preRender", **kwargs)
+  948  
+
+  980  
+  981:             self.core.callback("postRender", **kwargs)
+  982  
+
+Prism\Scripts\ProjectScripts\StateManagerNodes\default_ImportFile.py:
+  339          }
+  340:         result = self.core.callback("preImport", **kwargs)
+  341  
+
+  403          }
+  404:         result = self.core.callback("postImport", **kwargs)
+  405  
+
+Prism\Scripts\ProjectScripts\StateManagerNodes\default_Playblast.py:
+  510          }
+  511:         result = self.core.callback("prePlayblast", **kwargs)
+  512  
+
+  578              }
+  579:             result = self.core.callback("postPlayblast", **kwargs)
+  580  
