@@ -42,6 +42,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMaya as api
 import maya.OpenMayaUI as OpenMayaUI
+import pymel.core as pm
 
 try:
     import mtoa.aovs as maovs
