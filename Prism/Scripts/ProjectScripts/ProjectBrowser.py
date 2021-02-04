@@ -221,7 +221,6 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
         self.getRVpath()
         self.getDJVpath()
         self.getVLCpath()
-        self.getMPVpath()
         self.connectEvents()
         self.core.callback(
             name="onProjectBrowserStartup", types=["curApp", "custom"], args=[self]
@@ -1339,15 +1338,6 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
 
                 if mediaPlayback["pformat"] == "*.exr":
                     pAct.setEnabled(False)
-
-            if self.mpv is not None:
-                pAct = QAction("MPV", self)
-                pAct.triggered.connect(
-                    lambda: self.compare(
-                        current=True, prog="MPV", mediaPlayback=mediaPlayback
-                    )
-                )
-                playMenu.addAction(pAct)
 
             pAct = QAction("Default", self)
             pAct.triggered.connect(
@@ -4350,9 +4340,9 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
             vData = self.core.getConfig("information", configPath=path)
 
             vInfo = []
-            for i in vData:
-                i = i[0].upper() + i[1:]
-                vInfo.append([i, vData[i]])
+            for key in vData:
+                label = key[0].upper() + key[1:]
+                vInfo.append([label, vData[key]])
 
         if type(vInfo) == str or len(vInfo) == 0:
             self.core.popup(vInfo, severity="info")
@@ -5169,7 +5159,7 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
         ):
             mediaPlayback["timeline"].setPaused(True)
 
-        if prog in ["MPV", "DJV", "VLC", "default"] or (
+        if prog in ["DJV", "VLC", "default"] or (
             prog == ""
             and (
                 (self.rv is None)
@@ -5183,8 +5173,6 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
                 progPath = self.djv
             elif prog == "VLC":
                 progPath = self.vlc
-            elif prog == "MPV":
-                progPath = self.mpv
             elif prog in ["default", ""]:
                 progPath = ""
 
@@ -5563,16 +5551,6 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
         except:
             self.djv = None
 
-    @err_catcher(name=__name__)
-    def getMPVpath(self):
-        mpvPath = os.path.join(
-            self.core.prismLibs, "Tools", "mpv", "mpv.exe"
-        )
-        if os.path.exists(mpvPath):
-            self.mpv = mpvPath
-            return
-        self.mpv = None
-        
     @err_catcher(name=__name__)
     def getVLCpath(self):
         if platform.system() == "Windows":

@@ -415,6 +415,9 @@ class Prism_Maya_Functions(object):
         if height:
             cmds.setAttr("defaultResolution.height", height)
 
+        w, h = self.getResolution()
+        cmds.setAttr("defaultResolution.deviceAspectRatio", (w/float(h)))
+
     @err_catcher(name=__name__)
     def getAppVersion(self, origin):
         return str(cmds.about(apiVersion=True))
@@ -2110,6 +2113,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
         fileName = os.path.splitext(os.path.basename(impFileName))
         importOnly = True
         applyCache = False
+        updateCache = False
         importedNodes = []
 
         if fileName[1] in [".ma", ".mb", ".abc"]:
@@ -2150,12 +2154,13 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                 mode = "reference"
                 useNamespace = True
 
-                namespaceTemplate = "{entity}_{task}"
+                namespaceTemplate = "{fullEntity}_{task}"
                 namespaceTemplate = self.core.getConfig("globals", "defaultMayaNamespace", dft=namespaceTemplate, configPath=self.core.prismIni)
                 cacheData = self.core.paths.getCachePathData(impFileName)
 
                 try:
                     namespace = namespaceTemplate.format(**cacheData)
+                    namespace = os.path.basename(namespace)
                 except:
                     namespace = ""
                     useNamespace = False
@@ -2234,7 +2239,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     nSpace = validNodes[0].rsplit("|", 1)[0].rsplit(":", 1)[0]
                 else:
                     nSpace = ":"
-                applyCache = origin.stateMode == "ApplyCache"
+                updateCache = origin.stateMode == "ApplyCache"
 
             if fileName[1] == ".ma":
                 rtype = "mayaAscii"
@@ -2243,7 +2248,15 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
             elif fileName[1] == ".abc":
                 rtype = "Alembic"
 
-            if doRef:
+            if updateCache:
+                cmds.select(origin.setName)
+                cmds.AbcImport(
+                    impFileName,
+                    mode="import",
+                    connect=" ".join(cmds.ls(selection=True, long=True)),
+                )
+                importedNodes = cmds.ls(selection=True, long=True)
+            elif doRef:
                 validNodes = [x for x in origin.nodes if self.isNodeValid(origin, x)]
                 if (
                     len(validNodes) > 0
