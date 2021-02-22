@@ -112,9 +112,14 @@ class Prism_Houdini_ImportFile(object):
             comment = ""
             user = ""
 
+        versionLabel = data.get("version", "")
+        versionName = self.core.products.getVersionNameFromFilepath(path)
+        if versionName == "master":
+            versionLabel = self.core.products.getMasterVersionLabel(path)
+
         kwargs["node"].parm("entity").set(data.get("fullEntity"))
         kwargs["node"].parm("task").set(task)
-        kwargs["node"].parm("version").set(data.get("version", ""))
+        kwargs["node"].parm("version").set(versionLabel)
         kwargs["node"].parm("comment").set(comment)
         kwargs["node"].parm("user").set(user)
         kwargs["node"].parm("date").set(date)
@@ -156,3 +161,11 @@ class Prism_Houdini_ImportFile(object):
 
         descr = task + "\n" + version
         return descr
+
+    @err_catcher(name=__name__)
+    def abcGroupsToggled(self, kwargs):
+        abcNode = self.getStateFromNode(kwargs).ui.fileNode
+        if kwargs["node"].parm("groupsAbc").eval():
+            abcNode.parm("groupnames").set(4)
+        else:
+            abcNode.parm("groupnames").set(0)
