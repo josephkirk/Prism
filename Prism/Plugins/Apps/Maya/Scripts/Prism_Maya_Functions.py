@@ -201,7 +201,8 @@ class Prism_Maya_Functions(object):
             else:
                 origin.messageParent = mayaQtParent
 
-            origin.startasThread()
+            if not self.getAppVersion(self).startswith("2020"):
+                origin.startasThread()
         else:
             origin.messageParent = QWidget()
 
@@ -217,7 +218,7 @@ class Prism_Maya_Functions(object):
 
     @err_catcher(name=__name__)
     def onProjectChanged(self, origin):
-        if self.core.getConfig("maya", "setMayaProject", dft=True):
+        if self.core.getConfig("maya", "setMayaProject", dft=False):
             self.setMayaProject(self.core.projectPath)
 
         mayaModPath = os.path.join(
@@ -857,7 +858,7 @@ class Prism_Maya_Functions(object):
                         rootString += "-root %s " % i
 
                 expStr = (
-                    'AbcExport -j "-frameRange %s %s %s -eulerFilter -worldSpace -uvWrite -writeVisibility -stripNamespaces -file \\"%s\\""'
+                    'AbcExport -j "-frameRange %s %s %s -eulerFilter -worldSpace -uvWrite -writeUVSets -writeVisibility -stripNamespaces -file \\"%s\\""'
                     % (
                         startFrame,
                         endFrame,
@@ -887,7 +888,7 @@ class Prism_Maya_Functions(object):
                     if action == 0:
                         try:
                             mel.eval(
-                                'AbcExport -j "-frameRange %s %s %s -eulerFilter -worldSpace -uvWrite -writeVisibility -file \\"%s\\""'
+                                'AbcExport -j "-frameRange %s %s %s -eulerFilter -worldSpace -uvWrite -writeUVSets -writeVisibility -file \\"%s\\""'
                                 % (
                                     startFrame,
                                     endFrame,
@@ -2182,6 +2183,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     chb_namespace.setChecked(useNamespace)
                     e_namespace = QLineEdit()
                     e_namespace.setText(namespace)
+                    e_namespace.setEnabled(useNamespace)
                     nLayout.addWidget(chb_namespace)
                     nLayout.addWidget(e_namespace)
                     chb_namespace.toggled.connect(lambda x: e_namespace.setEnabled(x))
@@ -2402,7 +2404,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
         result = len(importedNodes) > 0
 
         rDict = {"result": result, "doImport": doImport}
-        rDict["mode"] = "ApplyCache" if applyCache else "ImportFile"
+        rDict["mode"] = "ApplyCache" if (applyCache or updateCache) else "ImportFile"
 
         return rDict
 
