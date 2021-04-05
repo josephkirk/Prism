@@ -820,6 +820,8 @@ class %s(QWidget, %s.%s, %s.%sClass):
     ):
         logger.debug("create state: %s" % statetype)
         if statetype not in self.stateTypes:
+            logger.warning("invalid state type: %s" % statetype)
+            logger.debug("available state types: %s" % self.stateTypes)
             return False
 
         item = QTreeWidgetItem([statetype])
@@ -876,6 +878,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
             parent.setExpanded(True)
 
         self.updateStateList()
+        self.stateInCreation = None
 
         if statetype != "Folder":
             item.setFlags(item.flags() & ~Qt.ItemIsDropEnabled)
@@ -896,7 +899,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
 
     @err_catcher(name=__name__)
     def copyAllStates(self):
-        stateData = self.core.appPlugin.sm_readStates(self)
+        stateData = getattr(self.core.appPlugin, "sm_readStates", lambda x: None)(self)
 
         cb = QClipboard()
         cb.setText(stateData)
@@ -1198,7 +1201,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
         self.saveEnabled = False
         self.loading = True
         if stateText is None:
-            stateText = self.core.appPlugin.sm_readStates(self)
+            stateText = getattr(self.core.appPlugin, "sm_readStates", lambda x: None)(self)
 
         stateData = None
         if stateText is not None:
@@ -1304,7 +1307,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
 
         stateStr = self.core.configs.writeJson(stateData)
 
-        self.core.appPlugin.sm_saveStates(self, stateStr)
+        getattr(self.core.appPlugin, "sm_saveStates", lambda x, y: None)(self, stateStr)
 
     @err_catcher(name=__name__)
     def saveImports(self):
@@ -1523,6 +1526,8 @@ class %s(QWidget, %s.%s, %s.%sClass):
         successPopup=True,
         saveScene=None,
         incrementScene=None,
+        sanityChecks=True,
+        versionWarning=True
     ):
         if self.publishPaused and not continuePublish:
             return
@@ -1558,207 +1563,23 @@ class %s(QWidget, %s.%s, %s.%sClass):
             if self.pubMsg and self.pubMsg.msg.isVisible():
                 self.pubMsg.msg.close()
         else:
-            if useVersion != "next":
-                msg = QMessageBox(
-                    QMessageBox.Information,
-                    actionString,
-                    'Are you sure you want to execute this state as version "%s"?\nThis may overwrite existing files.'
-                    % useVersion,
-                    QMessageBox.Cancel,
+            if useVersion != "next" and versionWarning:
+                msg = "Are you sure you want to execute this state as version \"%s\"?\nThis may overwrite existing files." % useVersion
+                result = self.core.popupQuestion(
+                    msg,
+                    title=actionString,
+                    buttons=["Continue", "Cancel"],
+                    icon=QMessageBox.Warning,
+                    escapeButton="Cancel"
                 )
-                msg.addButton("Continue", QMessageBox.YesRole)
-                self.core.parentWindow(msg)
-                action = msg.exec_()
 
-                if action != 0:
+                if result == "Cancel":
                     return
 
-            result = []
-            extResult = self.core.appPlugin.sm_getExternalFiles(self)
-            if extResult is not None:
-                extFiles, extFilesSource = extResult
-            else:
-                extFiles = []
-                extFilesSource = []
-
-            invalidFiles = []
-            nonExistend = []
-            for idx, i in enumerate(extFiles):
-                i = self.core.fixPath(i)
-
-                if not (
-                    i.startswith(self.core.projectPath)
-                    or (
-                        self.core.useLocalFiles
-                        and i.startswith(self.core.localProjectPath)
-                    )
-                ):
-                    if os.path.exists(i) and not i in invalidFiles:
-                        invalidFiles.append(i)
-
-                if (
-                    not os.path.exists(i)
-                    and not i in nonExistend
-                    and i != self.core.getCurrentFileName()
-                ):
-                    exists = getattr(
-                        self.core.appPlugin, "sm_existExternalAsset", lambda x, y: False
-                    )(self, i)
-                    if exists:
-                        continue
-
-                    nonExistend.append(i)
-
-            if len(invalidFiles) > 0:
-                depTitle = "The current scene contains dependencies from outside the project folder:\n\n"
-                depwarn = ""
-                for i in invalidFiles:
-                    parmStr = getattr(
-                        self.core.appPlugin, "sm_fixWarning", lambda x1, x2, x3, x4: ""
-                    )(self, i, extFiles, extFilesSource)
-
-                    depwarn += "\t%s\n\t%s\n\n" % (parmStr, i)
-
-                result.append([depTitle, depwarn, 2])
-
-            if len(nonExistend) > 0:
-                depTitle = (
-                    "The current scene contains dependencies, which does not exist:\n\n"
-                )
-                depwarn = ""
-                for i in nonExistend:
-                    parmStr = getattr(
-                        self.core.appPlugin, "sm_fixWarning", lambda x1, x2, x3, x4: ""
-                    )(self, i, extFiles, extFilesSource)
-                    depwarn += "\t%s\n\t%s\n\n" % (parmStr, i)
-
-                result.append([depTitle, depwarn, 2])
-
-            warnings = []
-            if len(result) > 0:
-                warnings.append(["", result])
-
-            if executeState:
-                warnings.append(self.execStates[0].ui.preExecuteState())
-            else:
-                for i in range(self.tw_export.topLevelItemCount()):
-                    curState = self.tw_export.topLevelItem(i)
-                    if curState.checkState(0) == Qt.Checked and curState in set(
-                        self.execStates
-                    ):
-                        warnings.append(curState.ui.preExecuteState())
-
-            warnString = ""
-            if self.core.uiAvailable:
-                for i in warnings:
-                    if len(i[1]) == 0:
-                        continue
-
-                    if i[0] == "":
-                        warnBase = ""
-                    else:
-                        warnString += "- <b>%s</b>\n\n" % i[0]
-                        warnBase = "\t"
-
-                    for k in i[1]:
-                        if k[2] == 2:
-                            warnString += (
-                                warnBase
-                                + (
-                                    '- <font color="yellow">%s</font>\n  %s\n'
-                                    % (k[0], k[1])
-                                ).replace("\n", "\n" + warnBase)
-                                + "\n"
-                            )
-                        elif k[2] == 3:
-                            warnString += (
-                                warnBase
-                                + (
-                                    '- <font color="red">%s</font>\n  %s\n'
-                                    % (k[0], k[1])
-                                ).replace("\n", "\n" + warnBase)
-                                + "\n"
-                            )
-            else:
-                for i in warnings:
-                    if len(i[1]) == 0:
-                        continue
-
-                    if i[0] == "":
-                        warnBase = ""
-                    else:
-                        warnString += "- %s\n" % i[0]
-                        warnBase = "\t"
-
-                    for k in i[1]:
-                        warnTitle = k[0].replace("\n", "")
-                        warnMsg = k[1].replace("\n", "")
-                        if k[2] == 2:
-                            warnString += (
-                                warnBase
-                                + ("- %s\n  %s" % (warnTitle, warnMsg)).replace(
-                                    "\n", "\n" + warnBase
-                                )
-                                + "\n"
-                            )
-                        elif k[2] == 3:
-                            warnString += (
-                                warnBase
-                                + ("- %s\n  %s" % (warnTitle, warnMsg)).replace(
-                                    "\n", "\n" + warnBase
-                                )
-                                + "\n"
-                            )
-
-            if warnString != "":
-                if self.core.uiAvailable:
-                    warnDlg = QDialog()
-
-                    warnDlg.setWindowTitle("Publish warnings")
-                    l_info = QLabel(str("The following warnings have occurred:\n"))
-
-                    warnString = "<pre>%s</pre>" % warnString.replace(
-                        "\n", "<br />"
-                    ).replace("\t", "    ")
-                    l_warnings = QLabel(warnString)
-                    l_warnings.setAlignment(Qt.AlignTop)
-
-                    sa_warns = QScrollArea()
-
-                    lay_warns = QHBoxLayout()
-                    lay_warns.addWidget(l_warnings)
-                    lay_warns.setContentsMargins(10, 10, 10, 10)
-                    lay_warns.addStretch()
-                    w_warns = QWidget()
-                    w_warns.setLayout(lay_warns)
-                    sa_warns.setWidget(w_warns)
-                    sa_warns.setWidgetResizable(True)
-
-                    bb_warn = QDialogButtonBox()
-
-                    bb_warn.addButton("Continue", QDialogButtonBox.AcceptRole)
-                    bb_warn.addButton("Cancel", QDialogButtonBox.RejectRole)
-
-                    bb_warn.accepted.connect(warnDlg.accept)
-                    bb_warn.rejected.connect(warnDlg.reject)
-
-                    bLayout = QVBoxLayout()
-                    bLayout.addWidget(l_info)
-                    bLayout.addWidget(sa_warns)
-                    bLayout.addWidget(bb_warn)
-                    warnDlg.setLayout(bLayout)
-                    warnDlg.setParent(self.core.messageParent, Qt.Window)
-                    warnDlg.resize(
-                        1000 * self.core.uiScaleFactor, 500 * self.core.uiScaleFactor
-                    )
-
-                    action = warnDlg.exec_()
-
-                    if action == 0:
-                        return
-
-                else:
-                    logger.warning(warnString)
+            if sanityChecks:
+                sanityResult = self.runSantityChecks(executeState)
+                if not sanityResult:
+                    return
 
             details = {}
             if self.description != "":
@@ -1907,6 +1728,197 @@ class %s(QWidget, %s.%s, %s.%sClass):
             )
 
     @err_catcher(name=__name__)
+    def runSantityChecks(self, executeState):
+        result = []
+        extResult = self.core.appPlugin.sm_getExternalFiles(self)
+        if extResult is not None:
+            extFiles, extFilesSource = extResult
+        else:
+            extFiles = []
+            extFilesSource = []
+
+        invalidFiles = []
+        nonExistend = []
+        for idx, i in enumerate(extFiles):
+            i = self.core.fixPath(i)
+
+            if not (
+                i.startswith(self.core.projectPath)
+                or (
+                    self.core.useLocalFiles
+                    and i.startswith(self.core.localProjectPath)
+                )
+            ):
+                if os.path.exists(i) and not i in invalidFiles:
+                    invalidFiles.append(i)
+
+            if (
+                not os.path.exists(i)
+                and not i in nonExistend
+                and i != self.core.getCurrentFileName()
+            ):
+                exists = getattr(
+                    self.core.appPlugin, "sm_existExternalAsset", lambda x, y: False
+                )(self, i)
+                if exists:
+                    continue
+
+                nonExistend.append(i)
+
+        if len(invalidFiles) > 0:
+            depTitle = "The current scene contains dependencies from outside the project folder:\n\n"
+            depwarn = ""
+            for i in invalidFiles:
+                parmStr = getattr(
+                    self.core.appPlugin, "sm_fixWarning", lambda x1, x2, x3, x4: ""
+                )(self, i, extFiles, extFilesSource)
+
+                depwarn += "\t%s\n\t%s\n\n" % (parmStr, i)
+
+            result.append([depTitle, depwarn, 2])
+
+        if len(nonExistend) > 0:
+            depTitle = (
+                "The current scene contains dependencies, which does not exist:\n\n"
+            )
+            depwarn = ""
+            for i in nonExistend:
+                parmStr = getattr(
+                    self.core.appPlugin, "sm_fixWarning", lambda x1, x2, x3, x4: ""
+                )(self, i, extFiles, extFilesSource)
+                depwarn += "\t%s\n\t%s\n\n" % (parmStr, i)
+
+            result.append([depTitle, depwarn, 2])
+
+        warnings = []
+        if len(result) > 0:
+            warnings.append(["", result])
+
+        if executeState:
+            warnings.append(self.execStates[0].ui.preExecuteState())
+        else:
+            for i in range(self.tw_export.topLevelItemCount()):
+                curState = self.tw_export.topLevelItem(i)
+                if curState.checkState(0) == Qt.Checked and curState in set(
+                    self.execStates
+                ):
+                    warnings.append(curState.ui.preExecuteState())
+
+        warnString = ""
+        if self.core.uiAvailable:
+            for i in warnings:
+                if len(i[1]) == 0:
+                    continue
+
+                if i[0] == "":
+                    warnBase = ""
+                else:
+                    warnString += "- <b>%s</b>\n\n" % i[0]
+                    warnBase = "\t"
+
+                for k in i[1]:
+                    if k[2] == 2:
+                        warnString += (
+                            warnBase
+                            + (
+                                '- <font color="yellow">%s</font>\n  %s\n'
+                                % (k[0], k[1])
+                            ).replace("\n", "\n" + warnBase)
+                            + "\n"
+                        )
+                    elif k[2] == 3:
+                        warnString += (
+                            warnBase
+                            + (
+                                '- <font color="red">%s</font>\n  %s\n'
+                                % (k[0], k[1])
+                            ).replace("\n", "\n" + warnBase)
+                            + "\n"
+                        )
+        else:
+            for i in warnings:
+                if len(i[1]) == 0:
+                    continue
+
+                if i[0] == "":
+                    warnBase = ""
+                else:
+                    warnString += "- %s\n" % i[0]
+                    warnBase = "\t"
+
+                for k in i[1]:
+                    warnTitle = k[0].replace("\n", "")
+                    warnMsg = k[1].replace("\n", "")
+                    if k[2] == 2:
+                        warnString += (
+                            warnBase
+                            + ("- %s\n  %s" % (warnTitle, warnMsg)).replace(
+                                "\n", "\n" + warnBase
+                            )
+                            + "\n"
+                        )
+                    elif k[2] == 3:
+                        warnString += (
+                            warnBase
+                            + ("- %s\n  %s" % (warnTitle, warnMsg)).replace(
+                                "\n", "\n" + warnBase
+                            )
+                            + "\n"
+                        )
+
+        if warnString != "":
+            if self.core.uiAvailable:
+                warnDlg = QDialog()
+
+                warnDlg.setWindowTitle("Publish warnings")
+                l_info = QLabel(str("The following warnings have occurred:\n"))
+
+                warnString = "<pre>%s</pre>" % warnString.replace(
+                    "\n", "<br />"
+                ).replace("\t", "    ")
+                l_warnings = QLabel(warnString)
+                l_warnings.setAlignment(Qt.AlignTop)
+
+                sa_warns = QScrollArea()
+
+                lay_warns = QHBoxLayout()
+                lay_warns.addWidget(l_warnings)
+                lay_warns.setContentsMargins(10, 10, 10, 10)
+                lay_warns.addStretch()
+                w_warns = QWidget()
+                w_warns.setLayout(lay_warns)
+                sa_warns.setWidget(w_warns)
+                sa_warns.setWidgetResizable(True)
+
+                bb_warn = QDialogButtonBox()
+
+                bb_warn.addButton("Continue", QDialogButtonBox.AcceptRole)
+                bb_warn.addButton("Cancel", QDialogButtonBox.RejectRole)
+
+                bb_warn.accepted.connect(warnDlg.accept)
+                bb_warn.rejected.connect(warnDlg.reject)
+
+                bLayout = QVBoxLayout()
+                bLayout.addWidget(l_info)
+                bLayout.addWidget(sa_warns)
+                bLayout.addWidget(bb_warn)
+                warnDlg.setLayout(bLayout)
+                warnDlg.setParent(self.core.messageParent, Qt.Window)
+                warnDlg.resize(
+                    1000 * self.core.uiScaleFactor, 500 * self.core.uiScaleFactor
+                )
+
+                action = warnDlg.exec_()
+
+                if action == 0:
+                    return
+
+            else:
+                logger.warning(warnString)
+
+        return True
+
+    @err_catcher(name=__name__)
     def getFrameRangeTypeToolTip(self, rangeType):
         tt = ""
         if rangeType == "State Manager":
@@ -1961,6 +1973,19 @@ No frame will be rendered twice. This makes it easier to spot problems in the se
             "description": self.description,
         }
 
+    @err_catcher(name=__name__)
+    def importFile(self, path, activateWindow=True):
+        if not path:
+            return
+
+        extension = os.path.splitext(path)[1]
+        stateType = getattr(self.core.appPlugin, "sm_getImportHandlerType", lambda x: None)(extension) or "ImportFile"
+
+        self.createState(stateType, importPath=path)
+        self.setListActive(self.tw_import)
+        if activateWindow:
+            self.activateWindow()
+
 
 class ImportDelegate(QStyledItemDelegate):
     def __init__(self, stateManager):
@@ -1982,30 +2007,37 @@ class ImportDelegate(QStyledItemDelegate):
         painterQPainter.fillRect(rect, QBrush(item.ui.statusColor))
 
 
-def openStateSettings(core, stateType, settings=None):
+def getStateWindow(core, stateType, settings=None, connectBBox=True):
     settings = settings or None
-    stateNameBase = stateType.replace(stateType.split("_", 1)[0] + "_", "")
+    #  stateNameBase = stateType.replace(stateType.split("_", 1)[0] + "_", "")
     sm = StateManager(core, forceStates=[stateType], standalone=True)
-    item = sm.createState(stateNameBase, stateData=settings)
+    item = sm.createState(stateType, stateData=settings)
+    if not item:
+        return
 
     dlg_settings = QDialog()
-    dlg_settings.setWindowTitle("Statesettings - %s" % stateNameBase)
-    w_settings = QWidget()
-    bb_settings = QDialogButtonBox()
-    bb_settings.addButton("Accept", QDialogButtonBox.AcceptRole)
-    bb_settings.addButton("Cancel", QDialogButtonBox.RejectRole)
-    bb_settings.accepted.connect(dlg_settings.accept)
-    bb_settings.rejected.connect(dlg_settings.reject)
+    dlg_settings.setWindowTitle("Statesettings - %s" % stateType)
+    dlg_settings.bb_settings = QDialogButtonBox()
+    dlg_settings.bb_settings.addButton("Accept", QDialogButtonBox.AcceptRole)
+    dlg_settings.bb_settings.addButton("Cancel", QDialogButtonBox.RejectRole)
+    if connectBBox:
+        dlg_settings.bb_settings.accepted.connect(dlg_settings.accept)
+        dlg_settings.bb_settings.rejected.connect(dlg_settings.reject)
 
     lo_settings = QVBoxLayout()
     lo_settings.addWidget(item.ui)
-    lo_settings.addWidget(bb_settings)
+    lo_settings.addWidget(dlg_settings.bb_settings)
     dlg_settings.setLayout(lo_settings)
     dlg_settings.setParent(core.messageParent, Qt.Window)
+    dlg_settings.stateItem = item
+    return dlg_settings
 
+
+def openStateSettings(core, stateType, settings=None):
+    dlg_settings = getStateWindow(stateType, settings)
     action = dlg_settings.exec_()
 
     if action == 0:
         return
 
-    return item.ui.getStateProps()
+    return dlg_settings.stateItem.ui.getStateProps()

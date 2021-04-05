@@ -37,6 +37,7 @@ import traceback
 import time
 import shutil
 import platform
+import logging
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -59,18 +60,22 @@ except:
 
 from PrismUtils.Decorators import err_catcher as err_catcher
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
+
+logger = logging.getLogger(__name__)
 
 def export_anim(root, exportPath, rootnode_name=None):
 
     create_nodes = []
     rootnode = None
     export_node = None
-
+    cam_export = False
     try:
-        targetjoint = pm.PyNode(root)
-        targetParent = targetjoint.getParent()
+        source_node_root = pm.PyNode(root)
+        if isinstance(source_node_root.getShape(), pm.nt.Camera):
+            cam_export = True
+            targetParent = None
+        else:
+            targetParent = source_node_root.getParent()
 
         if not rootnode_name and targetParent:
             rootnode_name = targetParent.nodeName()
@@ -80,54 +85,63 @@ def export_anim(root, exportPath, rootnode_name=None):
             create_nodes.append(rootnode)
             export_node = rootnode
 
-        target_name = targetjoint.namespace()
-        dupnode = targetjoint.duplicate()
-        dupjoint = dupnode[0]
-        dupjoint.setParent(rootnode)
+        target_name = source_node_root.namespace()
+        duplicated_node = source_node_root.duplicate()
+        duplicated_node = duplicated_node[0]
+        duplicated_node.setParent(rootnode)
         try:
-            dupjoint.rename(targetjoint.nodeName())
+            duplicated_node.rename(source_node_root.nodeName())
         except:
             pass
-        targethi = [(i,t) for i,t in zip(targetjoint.getChildren(ad=True), dupjoint.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
-        targethi.append((targetjoint, dupjoint))
+        targethi = [(i,t) for i,t in zip(source_node_root.getChildren(ad=True), duplicated_node.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
+        targethi.append((source_node_root, duplicated_node))
         exportPath = os.path.abspath(os.path.join(exportPath,target_name.replace(":","_"))).replace("\\","/")
         
         if not export_node:
-            export_node = dupjoint
+            export_node = duplicated_node
             create_nodes.append(export_node)
-        try:
-            pm.select(export_node, hi=True, r=True)
-            for i,t in targethi:
-                logging.info("Link {} to {}".format(i,t))
-                for atr in i.listAttr(k=True):
-                    atr >> t.attr(atr.longName())
-                pm.parentConstraint(i, t)
-                    
-                # for i in pm.listConnections(t,type="dagPose"):
-                #     pm.select(i.listConnections(type="skinCluster"),add=True)
-            
+        pm.select(export_node, hi=True, r=True)
+        for source_node, copied_node in targethi:
+            logger.info("Link {} to {}".format(source_node, copied_node))
+            for atr in source_node.listAttr(k=True):
+                try:
+                    target_attr = copied_node.attr(atr.longName())
+                    target_attr.unlock()
+                    atr >> target_attr
+                except Exception as why:
+                    logger.info("Failed to connect {}.\n {}".format(atr.longName(), why))
             try:
-                if os.path.exists(exportPath):
-                    os.remove(exportPath)
-                os.makedirs(os.path.dirname(exportPath))
-            except:
-                pass
-            import maya.mel
-            pm.refresh() # Dump Maya , you Stupid AF
-            maya.mel.eval('FBXResetExport')
-            maya.mel.eval('FBXExportFileVersion -v FBX201600;')
-            maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|UnitsSelector" -v Centimeters;')
-            maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|DynamicScaleConversion" -v true;')
-            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation" -v 1;')
-            maya.mel.eval('FBXExportBakeComplexAnimation -v 1;')
-            maya.mel.eval('FBXExportBakeResampleAnimation -v 1;')
-            maya.mel.eval('FBXExportBakeComplexStep -v 1;')
-            maya.mel.eval('FBXExportQuaternion -v quaternion;')
-            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(pm.playbackOptions(q=True, ast=True)))
-            maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(pm.playbackOptions(q=True, aet=True)))
-            maya.mel.eval('FBXExportConstraints -v 0;')
-            maya.mel.eval('FBXExportEmbeddedTextures -v 0;')
-            maya.mel.eval('FBXExportUpAxis z;')
+                pm.parentConstraint(source_node, copied_node)
+            except Exception as why:
+                logger.info("Failed to parent constrain {}.\n {}".format(source_node, copied_node))
+            # for i in pm.listConnections(t,type="dagPose"):
+            #     pm.select(i.listConnections(type="skinCluster"),add=True)
+        
+        try:
+            if os.path.exists(exportPath):
+                os.remove(exportPath)
+            os.makedirs(os.path.dirname(exportPath))
+        except:
+            pass
+        import maya.mel
+        pm.refresh() # Dump Maya , you Stupid AF
+        maya.mel.eval('FBXResetExport')
+        maya.mel.eval('FBXExportFileVersion -v FBX201600;')
+        maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|UnitsSelector" -v Centimeters;')
+        maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|DynamicScaleConversion" -v true;')
+        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation" -v 1;')
+        maya.mel.eval('FBXExportBakeComplexAnimation -v 1;')
+        maya.mel.eval('FBXExportBakeResampleAnimation -v 0;')
+        maya.mel.eval('FBXExportBakeComplexStep -v 1;')
+        maya.mel.eval('FBXExportQuaternion -v quaternion;')
+        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(pm.playbackOptions(q=True, ast=True)))
+        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(pm.playbackOptions(q=True, aet=True)))
+        maya.mel.eval('FBXExportConstraints -v 0;')
+        maya.mel.eval('FBXExportEmbeddedTextures -v 0;')
+        maya.mel.eval('FBXExportUpAxis z;')
+        if cam_export:
+            maya.mel.eval('FBXExportCamera -v 1;')
+        else:
             maya.mel.eval('FBXExportSkins -v 1;')
             maya.mel.eval('FBXExportSkeletonDefinitions -v 1;')
             maya.mel.eval('FBXExportShapes -v 1;')
@@ -141,14 +155,11 @@ def export_anim(root, exportPath, rootnode_name=None):
             maya.mel.eval('FBXProperty "Export|IncludeGrp|Geometry|Triangulate" -v 1;')
             maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|HideComplexAnimationBakedWarning" -v 1;')
             maya.mel.eval('FBXExportSplitAnimationIntoTakes -c;')
-            # maya.mel.eval('FBXExportSplitAnimationIntoTakes -v \"Take001\" {} {}'.format(pm.playbackOptions(q=True, ast=True), pm.playbackOptions(q=True, aet=True)))
-            maya.mel.eval(("FBXExport -f \"{}\" -s;").format(exportPath))
-            # pm.refresh() # Dump Maya , you Stupid AF
-            # maya.mel.eval(("file -force -options \"fbx\" -typ \"FBX export\" -pr -es \"{}\"").format(exportPath))
-            # pm.FBXExport(exportPath, "-s")
-        except Exception as why:
-            logging.error("Export Failed.{}".format(why))
-            raise
+        # maya.mel.eval('FBXExportSplitAnimationIntoTakes -v \"Take001\" {} {}'.format(pm.playbackOptions(q=True, ast=True), pm.playbackOptions(q=True, aet=True)))
+        maya.mel.eval(("FBXExport -f \"{}\" -s;").format(exportPath))
+        # pm.refresh() # Dump Maya , you Stupid AF
+        # maya.mel.eval(("file -force -options \"fbx\" -typ \"FBX export\" -pr -es \"{}\"").format(exportPath))
+        # pm.FBXExport(exportPath, "-s")
     finally:
         for n in create_nodes:
             try:
@@ -161,6 +172,7 @@ class Prism_Maya_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
+        self.importHandlers = {}
 
     @err_catcher(name=__name__)
     def startup(self, origin):
@@ -546,11 +558,11 @@ class Prism_Maya_Functions(object):
         if objects:
             cmds.select(objects)
 
-        setName = self.validate(origin.l_taskName.text())
+        setName = self.validate(origin.getTaskname())
         if not setName:
             setName = self.sm_export_setTaskText(origin, None, "Export")
 
-        setName = self.validate(origin.l_taskName.text())
+        setName = self.validate(origin.getTaskname())
         for i in cmds.ls(selection=True, long=True):
             if i not in origin.nodes:
                 try:
@@ -619,7 +631,8 @@ class Prism_Maya_Functions(object):
         origin.f_objectList.setStyleSheet(
             "QFrame { border: 0px solid rgb(150,150,150); }"
         )
-        origin.w_additionalOptions.setVisible(False)
+        if hasattr(origin, "w_additionalOptions"):
+            origin.w_additionalOptions.setVisible(False)
 
         origin.w_exportNamespaces = QWidget()
         origin.lo_exportNamespaces = QHBoxLayout()
@@ -728,19 +741,19 @@ class Prism_Maya_Functions(object):
 
     @err_catcher(name=__name__)
     def sm_export_removeSetItem(self, origin, node):
-        setName = self.validate(origin.l_taskName.text())
+        setName = self.validate(origin.getTaskname())
         cmds.sets(node, remove=setName)
 
     @err_catcher(name=__name__)
     def sm_export_clearSet(self, origin):
-        setName = origin.l_taskName.text()
+        setName = origin.getTaskname()
         if self.isNodeValid(origin, setName):
             cmds.sets(clear=setName)
 
     @err_catcher(name=__name__)
     def sm_export_updateObjects(self, origin):
         prevSel = cmds.ls(selection=True, long=True)
-        setName = self.validate(origin.l_taskName.text())
+        setName = self.validate(origin.getTaskname())
         if not setName:
             setName = self.sm_export_setTaskText(origin, None, "Export")
 
@@ -789,7 +802,7 @@ class Prism_Maya_Functions(object):
     ):
         cmds.select(clear=True)
         if nodes is None:
-            setName = self.validate(origin.l_taskName.text())
+            setName = self.validate(origin.getTaskname())
             if not self.isNodeValid(origin, setName):
                 return (
                     'Canceled: The selection set "%s" is invalid.'
@@ -805,7 +818,7 @@ class Prism_Maya_Functions(object):
             ]
 
         if expType is None:
-            expType = origin.cb_outType.currentText()
+            expType = origin.getOutputType()
 
         if expType == ".obj":
             cmds.loadPlugin("objExport", quiet=True)
@@ -1044,7 +1057,7 @@ class Prism_Maya_Functions(object):
 
         if scaledExport:
             cmds.delete(nodes)
-        elif origin.chb_convertExport.isChecked():
+        elif origin.getUnitConvert():
             if expType == ".obj":
                 QMessageBox.warning(
                     self.core.messageParent,
@@ -1154,7 +1167,7 @@ class Prism_Maya_Functions(object):
 
     @err_catcher(name=__name__)
     def sm_export_preDelete(self, origin):
-        setName = self.validate(origin.l_taskName.text())
+        setName = self.validate(origin.getTaskname())
         try:
             cmds.delete(setName)
         except:
@@ -1181,10 +1194,10 @@ class Prism_Maya_Functions(object):
     def sm_export_preExecute(self, origin, startFrame, endFrame):
         warnings = []
 
-        if origin.cb_outType.currentText() != "ShotCam":
+        if origin.getOutputType() != "ShotCam":
             if (
-                origin.cb_outType.currentText() == ".obj"
-                and origin.chb_convertExport.isChecked()
+                origin.getOutputType() == ".obj"
+                and origin.getUnitConvert()
             ):
                 warnings.append(
                     [
@@ -2115,6 +2128,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
         importOnly = True
         applyCache = False
         updateCache = False
+        doGpuCache = False
         importedNodes = []
 
         if fileName[1] in [".ma", ".mb", ".abc"]:
@@ -2175,6 +2189,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     rb_import = QRadioButton("Import objects only")
                     rb_reference.setChecked(mode == "import")
                     rb_applyCache = QRadioButton("Apply as cache to selected objects")
+                    rb_gpuCache = QRadioButton("Load as GPU cache")
                     rb_reference.setChecked(mode == "applyCache")
                     w_namespace = QWidget()
                     nLayout = QHBoxLayout()
@@ -2195,6 +2210,12 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     if fileName[1] != ".abc" or len(cmds.ls(selection=True)) == 0:
                         rb_applyCache.setEnabled(False)
 
+                    rb_gpuCache.toggled.connect(
+                        lambda x: w_namespace.setEnabled(not x)
+                    )
+                    if fileName[1] != ".abc":
+                        rb_gpuCache.setEnabled(False)
+
                     bb_warn = QDialogButtonBox()
                     bb_warn.addButton("Ok", QDialogButtonBox.AcceptRole)
                     bb_warn.addButton("Cancel", QDialogButtonBox.RejectRole)
@@ -2206,6 +2227,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     bLayout.addWidget(rb_reference)
                     bLayout.addWidget(rb_import)
                     bLayout.addWidget(rb_applyCache)
+                    bLayout.addWidget(rb_gpuCache)
                     bLayout.addWidget(w_namespace)
                     bLayout.addWidget(bb_warn)
                     refDlg.setLayout(bLayout)
@@ -2222,6 +2244,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     else:
                         doRef = rb_reference.isChecked()
                         applyCache = rb_applyCache.isChecked()
+                        doGpuCache = rb_gpuCache.isChecked()
                         if chb_namespace.isChecked():
                             nSpace = e_namespace.text()
                         else:
@@ -2229,6 +2252,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                 else:
                     doRef = mode == "reference"
                     applyCache = mode == "applyCache"
+                    doGpuCache = mode == "gpuCache"
                     if useNamespace:
                         nSpace = namespace
                     else:
@@ -2238,6 +2262,7 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     cmds.referenceQuery(validNodes[0], isNodeReferenced=True)
                     or cmds.objectType(validNodes[0]) == "reference"
                 )
+                doGpuCache = bool([node for node in origin.nodes if cmds.objectType(node) == "gpuCache"])
                 if ":" in validNodes[0]:
                     nSpace = validNodes[0].rsplit("|", 1)[0].rsplit(":", 1)[0]
                 else:
@@ -2314,6 +2339,16 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                             pass
                     importedNodes = [refNode]
 
+            elif doGpuCache:
+                if update:
+                    gpuNode = [node for node in origin.nodes if cmds.objectType(node) == "gpuCache"][0]
+                    importedNodes = self.updateGpuCache(gpuNode, impFileName, name=fileName[0])
+                else:
+                    origin.preDelete(
+                        baseText="Do you want to delete the currently connected objects?\n\n"
+                    )
+                    importedNodes = self.createGpuCache(impFileName, name=fileName[0]) or []
+
             elif importOnly:
                 origin.preDelete(
                     baseText="Do you want to delete the currently connected objects?\n\n"
@@ -2376,13 +2411,32 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
                     mel.eval("FBXImportMode -v merge")
                     mel.eval("FBXImportConvertUnitString  -v cm")
 
-                try:
-                    importedNodes = cmds.file(impFileName, i=True, returnNewNodes=True)
-                except Exception as e:
+                kwargs = {
+                    "i": True,
+                    "returnNewNodes": True,
+                    "importFunction": self.basicImport
+                }
+
+                if fileName[1] in self.importHandlers:
+                    kwargs.update(self.importHandlers[fileName[1]])
+
+                result = kwargs["importFunction"](impFileName, kwargs)
+
+                if result and result["result"]:
+                    importedNodes = result["nodes"]
+                else:
                     importedNodes = []
+                    if result:
+                        if "error" not in result:
+                            return
+
+                        error = str(result["error"])
+                    else:
+                        error = ""
+
                     msg = "An error occured while importing the file:\n\n%s\n\n%s" % (
                         impFileName,
-                        str(e),
+                        error,
                     )
                     self.core.popup(msg, title="Import error")
 
@@ -2399,16 +2453,52 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
         # buggy
         # cmds.select([ x for x in origin.nodes if self.isNodeValid(origin, x)])
         self.validateSet(origin.setName)
+        if self.isNodeValid(self, origin.setName):
+            cmds.delete(origin.setName)
+
         if len(origin.nodes) > 0:
             origin.setName = cmds.sets(name="Import_%s_" % fileName[0])
-        for i in origin.nodes:
-            cmds.sets(i, include=origin.setName)
+        for node in origin.nodes:
+            cmds.sets(node, include=origin.setName)
         result = len(importedNodes) > 0
 
         rDict = {"result": result, "doImport": doImport}
         rDict["mode"] = "ApplyCache" if (applyCache or updateCache) else "ImportFile"
 
         return rDict
+
+    @err_catcher(name=__name__)
+    def basicImport(self, filepath, kwargs):
+        del kwargs["importFunction"]
+        try:
+            importedNodes = cmds.file(filepath, **kwargs)
+        except Exception as e:
+            result = {"result": False, "error": e}
+            return result
+
+        result = {"result": True, "nodes": importedNodes}
+        return result
+
+    @err_catcher(name=__name__)
+    def createGpuCache(self, filepath, geoPath="|", name=None):
+        cmds.loadPlugin("gpuCache.mll", quiet=True)
+        parent = cmds.createNode("transform", name=name)
+        node = cmds.createNode("gpuCache", parent=parent)
+        cmds.setAttr(node + ".cacheFileName", filepath, type="string")
+        cmds.setAttr(node + ".cacheGeomPath", geoPath, type="string")
+        return [parent, node]
+
+    @err_catcher(name=__name__)
+    def updateGpuCache(self, node, filepath, geoPath="|", name=None):
+        nodes = [node]
+        cmds.setAttr(node + ".cacheFileName", filepath, type="string")
+        cmds.setAttr(node + ".cacheGeomPath", geoPath, type="string")
+        if name:
+            parent = cmds.ls(node, long=True)[0].rsplit("|", 1)[0]
+            renamedParent = cmds.rename(parent, name)
+            nodes = [renamedParent]
+            nodes += cmds.listRelatives(renamedParent)
+        return nodes
 
     @err_catcher(name=__name__)
     def validateSet(self, setName):
@@ -2619,8 +2709,10 @@ Show only polygon objects in viewport.
         selFmt = origin.cb_formats.currentText()
         if selFmt == "avi (with audio)":
             fmt = "avi"
+            outputName += ".avi"
         elif selFmt == "qt (with audio)":
             fmt = "qt"
+            outputName += ".mov"
         else:
             fmt = "image"
 
@@ -2637,16 +2729,78 @@ Show only polygon objects in viewport.
                 origin.sp_resWidth.value(),
                 origin.sp_resHeight.value(),
             )
+        else:
+            if origin.cb_formats.currentText() == ".mp4":
+                res = self.getViewportResolution()
+                if not self.isViewportResolutionEven(res):
+                    evenRes = self.getEvenViewportResolution(res)
+                    cmdString += ", width=%s, height=%s" % (
+                        evenRes["width"],
+                        evenRes["height"],
+                    )
+                    logger.debug("using even resolution to be able to convert to mp4")
 
         cmdString += ")"
 
         self.executeScript(origin, cmdString, logErr=False)
         if len(os.listdir(os.path.dirname(outputName))) < 2 and fmt == "qt":
             self.core.popup("Couldn't create quicktime video. Make sure quicktime is installed on your system and try again.")
+        else:
+            origin.updateLastPath(outputName)
+
+    @err_catcher(name=__name__)
+    def getViewFromName(self, viewportName):
+        view = OpenMayaUI.M3dView()
+        OpenMayaUI.M3dView.getM3dViewFromModelEditor(viewportName, view)
+        return view
+
+    @err_catcher(name=__name__)
+    def getViewportResolution(self, view=None):
+        if not view:
+            view = OpenMayaUI.M3dView.active3dView()
+        width = view.portWidth()
+        height = view.portHeight()
+        return {"width": width, "height": height}
+
+    @err_catcher(name=__name__)
+    def isViewportResolutionEven(self, resolution):
+        evenRes = self.getEvenViewportResolution(resolution)
+        return evenRes == resolution
+
+    @err_catcher(name=__name__)
+    def getEvenViewportResolution(self, resolution):
+        if resolution["width"] % 2:
+            width = resolution["width"] - 1
+        else:
+            width = resolution["width"]
+
+        if resolution["height"] % 2:
+            height = resolution["height"] - 1
+        else:
+            height = resolution["height"]
+
+        return {"width": width, "height": height}
 
     @err_catcher(name=__name__)
     def sm_playblast_preExecute(self, origin):
         warnings = []
+
+        if not origin.chb_resOverride.isChecked():
+            res = self.getViewportResolution()
+            if not self.isViewportResolutionEven(res):
+                if origin.cb_formats.currentText() == ".mp4":
+                    warning = [
+                        "Viewport resolution is not even",
+                        "The resolution for mp4 files has to be even. The playblast resolution will be adjusted to be even.",
+                        2,
+                    ]
+                else:
+                    warning = [
+                        "Viewport resolution is not even",
+                        "Creating .jpg files with uneven resolution cannot be converted to mp4 videos later on.",
+                        2,
+                    ]
+                warnings.append(warning)
 
         return warnings
 
@@ -2736,7 +2890,10 @@ Show only polygon objects in viewport.
     def sm_readStates(self, origin):
         val = cmds.fileInfo("PrismStates", query=True)
         if len(val) != 0:
-            stateStr = val[0].decode('string_escape')
+            if sys.version[0] == "2":
+                stateStr = val[0].decode('string_escape')
+            else:
+                stateStr = str.encode(val[0]).decode('unicode_escape')
 
             # for backwards compatibility with scenes created before v1.3.0
             jsonData = self.core.configs.readJson(data=stateStr)

@@ -66,6 +66,7 @@ class ExportClass(object):
         self.curCam = None
         self.initsim = True
 
+        self.setTaskname("")
         self.cb_outType.addItems(self.core.appPlugin.outputFormats)
         self.export_paths = self.core.paths.getExportProductBasePaths()
 
@@ -137,17 +138,9 @@ class ExportClass(object):
             self.sp_rangeStart.setValue(hou.playbar.playbackRange()[0])
             self.sp_rangeEnd.setValue(hou.playbar.playbackRange()[1])
 
-        self.nameChanged(state.text(0))
         self.managerChanged(True)
-
         self.connectEvents()
-
-        self.b_changeTask.setStyleSheet(
-            "QPushButton { background-color: rgb(150,0,0); border: none;}"
-        )
-
         self.core.appPlugin.fixStyleSheet(self.gb_submit)
-
         self.e_osSlaves.setText("All")
 
         self.updateUi()
@@ -166,17 +159,14 @@ class ExportClass(object):
                     self.cb_sCamShot.setCurrentIndex(idx)
 
             if fnameData.get("category") and not self.isPrismFilecacheNode(self.node):
-                self.l_taskName.setText(fnameData.get("category"))
-                self.b_changeTask.setStyleSheet("")
+                self.setTaskname(fnameData.get("category"))
 
     @err_catcher(name=__name__)
     def loadData(self, data):
         if "statename" in data:
             self.e_name.setText(data["statename"])
         if "taskname" in data:
-            self.l_taskName.setText(data["taskname"])
-            if data["taskname"] != "":
-                self.b_changeTask.setStyleSheet("")
+            self.setTaskname(data["taskname"])
         if "rangeType" in data:
             idx = self.cb_rangeType.findText(data["rangeType"])
             if idx != -1:
@@ -471,11 +461,8 @@ class ExportClass(object):
         result = self.nameWin.exec_()
 
         if result == 1:
-            self.l_taskName.setText(self.nameWin.e_item.text())
-            self.nameChanged(self.e_name.text())
-
-            self.b_changeTask.setStyleSheet("")
-
+            taskName = self.nameWin.e_item.text()
+            self.setTaskname(taskName)
             self.stateManager.saveStatesToScene()
 
     @err_catcher(name=__name__)
@@ -643,12 +630,11 @@ class ExportClass(object):
                 if frange:
                     startFrame, endFrame = frange
         elif rangeType == "Node" and self.node:
-            if self.isPrismFilecacheNode(self.node):
-                if self.node.parm("framerange").eval() == 0:
-                    startFrame = self.core.appPlugin.getCurrentFrame()
-                    endFrame = startFrame
+            api = self.core.appPlugin.getApiFromNode(self.node)
+            if api:
+                startFrame, endFrame = api.getFrameRange(self.node)
 
-            if not startFrame:
+            if startFrame is None:
                 try:
                     startFrame = self.node.parm("f1").eval()
                     endFrame = self.node.parm("f2").eval()
@@ -1076,6 +1062,10 @@ class ExportClass(object):
             # )
 
             rangeType = self.cb_rangeType.currentText()
+            if self.isPrismFilecacheNode(self.node):
+                if self.core.appPlugin.filecache.isSingleFrame(self.node):
+                    rangeType = "Single Frame"
+
             framePadding = ".$F4" if rangeType != "Single Frame" else ""
             extension = self.cb_outType.currentText()
 
@@ -1096,6 +1086,7 @@ class ExportClass(object):
                 location=location
             )
 
+        outputPath = outputPath.replace("\\", "/")
         outputFolder = os.path.dirname(outputPath)
         hVersion = self.core.products.getVersionFromFilepath(outputPath)
 
@@ -1317,22 +1308,22 @@ class ExportClass(object):
             if self.cb_outType.currentText() in [".abc", ".fbx", ".usd"]:
                 outputName = outputName.replace(".$F4", "")
 
-            fc = self.isPrismFilecacheNode(self.node)
+            api = self.core.appPlugin.getApiFromNode(self.node)
             isStart = ropNode.parm("f1").eval() == startFrame
             isEnd = ropNode.parm("f2").eval() == endFrame
 
-            if not fc:
+            if not api:
                 if not self.core.appPlugin.setNodeParm(ropNode, "trange", val=1):
                     return [self.state.text(0) + ": error - Publish canceled"]
 
-            if not (fc and isStart):
+            if not (api and isStart):
                 if not self.core.appPlugin.setNodeParm(ropNode, "f1", clear=True):
                     return [self.state.text(0) + ": error - Publish canceled"]
 
                 if not self.core.appPlugin.setNodeParm(ropNode, "f1", val=startFrame):
                     return [self.state.text(0) + ": error - Publish canceled"]
 
-            if not (fc and isEnd):
+            if not (api and isEnd):
                 if not self.core.appPlugin.setNodeParm(ropNode, "f2", clear=True):
                     return [self.state.text(0) + ": error - Publish canceled"]
 
@@ -1427,6 +1418,7 @@ class ExportClass(object):
             self.b_copyLast.setEnabled(True)
 
             self.stateManager.saveStatesToScene()
+            updateMaster = True
 
             for idx, outputName in enumerate(outputNames):
                 outputName = outputName.replace("\\", "/")
@@ -1465,9 +1457,11 @@ class ExportClass(object):
                 else:
                     try:
                         result = self.executeNode()
-
                         if result:
-                            if len(os.listdir(os.path.dirname(expandedOutputName))) > 0:
+                            if result == "background":
+                                updateMaster = False
+
+                            if result == "background" or len(os.listdir(os.path.dirname(expandedOutputName))) > 0:
                                 result = "Result=Success"
                             else:
                                 result = "unknown error (files do not exist)"
@@ -1490,9 +1484,10 @@ class ExportClass(object):
                     if not self.core.appPlugin.setNodeParm(transformNode, "scale", val=1):
                         return [self.state.text(0) + ": error - Publish canceled"]
 
-            useMaster = self.core.getConfig("globals", "useMasterVersion", dft=False, config="project")
-            if useMaster:
-                self.core.products.updateMasterVersion(expandedOutputName)
+            if updateMaster:
+                useMaster = self.core.getConfig("globals", "useMasterVersion", dft=False, config="project")
+                if useMaster:
+                    self.core.products.updateMasterVersion(expandedOutputName)
 
             kwargs = {
                 "state": self,
@@ -1528,7 +1523,7 @@ class ExportClass(object):
     def executeNode(self):
         result = True
         if self.isPrismFilecacheNode(self.node):
-            self.core.appPlugin.filecache.executeNode(self.node)
+            result = self.core.appPlugin.filecache.executeNode(self.node)
         else:
             self.node.parm("execute").pressButton()
 

@@ -47,7 +47,6 @@ import subprocess
 import logging
 import tempfile
 import hashlib
-from collections import OrderedDict
 from datetime import datetime
 
 # check if python 2 or python 3 is used
@@ -184,7 +183,7 @@ class PrismCore:
 
         try:
             # set some general variables
-            self.version = "v1.3.0.70"
+            self.version = "v1.3.0.80"
             self.requiredLibraries = "v1.3.0.0"
             self.core = self
 
@@ -254,6 +253,7 @@ class PrismCore:
             self.versionPadding = 4
             self.framePadding = 4
             self.versionFormatVan = "v#"
+            self.versionFormat = self.versionFormatVan.replace("#", "%0{}d".format(self.versionPadding))
             self.debugMode = False
             self.useLocalFiles = False
             self.pb = None
@@ -383,6 +383,9 @@ class PrismCore:
 
     @err_catcher(name=__name__)
     def startup(self):
+        if not self.appPlugin:
+            return
+
         if self.appPlugin.hasQtParent:
             self.elapsed += 1
             if self.elapsed > self.maxwait and hasattr(self, "timer"):
@@ -521,24 +524,20 @@ class PrismCore:
         version2 = str(version2).split(".")
         version2 = [int(str(x)) for x in version2]
 
-        if (
-            version1[0] < version2[0]
-            or (version1[0] == version2[0] and version1[1] < version2[1])
-            or (
-                version1[0] == version2[0]
-                and version1[1] == version2[1]
-                and version1[2] < version2[2]
-            )
-            or (
-                version1[0] == version2[0]
-                and version1[1] == version2[1]
-                and version1[2] == version2[2]
-                and version1[3] < version2[3]
-            )
-        ):
-            return "lower"
-        else:
-            return "higher"
+        if len(version1) != len(version2):
+            while len(version1) > len(version2):
+                version2.append(0)
+
+            while len(version1) < len(version2):
+                version1.append(0)
+
+        for idx in range(len(version1)):
+            if version1[idx] < version2[idx]:
+                return "lower"
+            elif version1[idx] > version2[idx]:
+                return "higher"
+
+        return "equal"
 
     @err_catcher(name=__name__)
     def checkCommands(self):
@@ -589,11 +588,20 @@ class PrismCore:
             curName = command[1]
             newName = command[2]
             self.entities.renameShot(curName, newName)
+
+        elif command[0] == "renameLocalShot":
+            curName = command[1]
+            newName = command[2]
+            msg = "A shot in your project was renamed from \"%s\" to \"%s\". Do you want to check if there are local files with the old shotname and rename them to the new shotname?" % (curName, newName)
+            result = self.popupQuestion(msg)
+            if result == "Yes":
+                self.entities.renameShot(curName, newName, locations=["local"])
+
         else:
             self.popup("Unknown command: %s" % (command))
 
     @err_catcher(name=__name__)
-    def createCmd(self, cmd):
+    def createCmd(self, cmd, includeCurrent=False):
         if not os.path.exists(self.prismIni):
             return
 
@@ -605,7 +613,10 @@ class PrismCore:
                 return
 
         for i in os.listdir(cmdDir):
-            if i == self.username:
+            if not includeCurrent and i == socket.gethostname():
+                continue
+
+            if i == socket.gethostname():
                 self.handleCmd(cmd)
                 continue
 
@@ -626,27 +637,33 @@ class PrismCore:
 
     @err_catcher(name=__name__)
     def getLocalPath(self):
-        try:
-            import SetPath
-        except:
-            modPath = imp.find_module("SetPath")[1]
-            if modPath.endswith(".pyc") and os.path.exists(modPath[:-1]):
-                os.remove(modPath)
-            import SetPath
+        defaultLocalPath = self.projects.getDefaultLocalPath()
+        if self.uiAvailable:
+            try:
+                import SetPath
+            except:
+                modPath = imp.find_module("SetPath")[1]
+                if modPath.endswith(".pyc") and os.path.exists(modPath[:-1]):
+                    os.remove(modPath)
+                import SetPath
 
-        self.pathWin = SetPath.SetPath(core=self)
-        self.pathWin.setModal(True)
-        self.parentWindow(self.pathWin)
-        result = self.pathWin.exec_()
-        self.localProjectPath = ""
-        if result == 1:
-            setPathResult = self.setLocalPath(self.pathWin.e_path.text())
+            self.pathWin = SetPath.SetPath(core=self)
+            self.pathWin.setModal(True)
+            self.parentWindow(self.pathWin)
+            self.pathWin.e_path.setText(defaultLocalPath)
+            result = self.pathWin.exec_()
+            self.localProjectPath = ""
+            if result == 1:
+                setPathResult = self.setLocalPath(self.pathWin.e_path.text())
+            else:
+                return False
+
+            if not setPathResult and result == 1:
+                self.popup("Please enter a valid path to continue.")
+                self.getLocalPath()
         else:
-            return False
-
-        if not setPathResult and result == 1:
-            self.popup("Please enter a valid path to continue.")
-            self.getLocalPath()
+            logger.info("setting local project path to: %s" % defaultLocalPath)
+            self.setLocalPath(defaultLocalPath)
 
         return True
 
@@ -733,8 +750,8 @@ class PrismCore:
     def parentWindow(self, win, parent=None):
         self.scaleUI(win)
 
-        if not self.appPlugin.hasQtParent:
-            if self.appPlugin.pluginName != "Standalone" and self.useOnTop:
+        if not self.appPlugin or not self.appPlugin.hasQtParent:
+            if not self.appPlugin or (self.appPlugin.pluginName != "Standalone" and self.useOnTop):
                 win.setWindowFlags(win.windowFlags() ^ Qt.WindowStaysOnTopHint)
 
         if (not parent and not self.parentWindows) or not self.uiAvailable:
@@ -873,16 +890,20 @@ License: GNU GPL-3.0-or-later<br>
         webbrowser.open(url)
 
     @err_catcher(name=__name__)
-    def getStateManager(self):
+    def getStateManager(self, create=True):
         sm = getattr(self, "sm", None)
-        if not sm:
+        if not sm and create:
             sm = self.stateManager(openUi=False)
 
         return sm
 
     @err_catcher(name=__name__)
+    def stateManagerEnabled(self):
+        return self.appPlugin.appType == "3d"
+
+    @err_catcher(name=__name__)
     def stateManager(self, stateDataPath=None, restart=False, openUi=True, reload_module=False):
-        if self.appPlugin.appType != "3d":
+        if not self.stateManagerEnabled():
             return False
 
         if not self.projects.ensureProject(openUi="stateManager"):
@@ -1028,15 +1049,16 @@ License: GNU GPL-3.0-or-later<br>
         return True
 
     @err_catcher(name=__name__)
-    def prismSettings(self, tab=0):
+    def prismSettings(self, tab=0, restart=False, reload_module=False):
         if getattr(self, "ps", None) and self.ps.isVisible():
             self.ps.close()
 
-        if not getattr(self, "ps", None) or self.debugMode:
-            try:
-                del sys.modules["PrismSettings"]
-            except:
-                pass
+        if not getattr(self, "ps", None) or self.debugMode or restart or reload_module:
+            if not getattr(self, "ps", None) or self.debugMode or reload_module:
+                try:
+                    del sys.modules["PrismSettings"]
+                except:
+                    pass
 
             try:
                 import PrismSettings
@@ -1392,8 +1414,10 @@ License: GNU GPL-3.0-or-later<br>
             prjPath = self.localProjectPath
         else:
             prjPath = self.paths.getExportProductBasePaths().get(location, "")
-        scenePath = os.path.normpath(os.path.join(prjPath, sceneName))
+            if not prjPath:
+                prjPath = self.paths.getRenderProductBasePaths().get(location, "")
 
+        scenePath = os.path.normpath(os.path.join(prjPath, sceneName))
         return scenePath
 
     @property
@@ -1440,19 +1464,11 @@ License: GNU GPL-3.0-or-later<br>
     @err_catcher(name=__name__)
     def convertPath(self, path, target="global"):
         path = os.path.normpath(path)
-        if self.useLocalFiles:
-            if target == "global":
-                scenePath = self.getScenePath("local")
-                if path.startswith(scenePath):
-                    path = path.replace(
-                        self.core.localProjectPath, self.core.projectPath
-                    )
-            elif target == "local":
-                scenePath = self.getScenePath("global")
-                if path.startswith(scenePath):
-                    path = path.replace(
-                        self.core.projectPath, self.core.localProjectPath
-                    )
+        source = self.paths.getLocationFromPath(path)
+        sourcePath = self.getScenePath(source)
+        targetPath = self.getScenePath(target)
+        if path.startswith(sourcePath):
+            path = path.replace(sourcePath, targetPath)
 
         return path
 
@@ -1795,7 +1811,11 @@ License: GNU GPL-3.0-or-later<br>
         return path
 
     @err_catcher(name=__name__)
-    def getFileModificationDate(self, path):
+    def getFileModificationDate(self, path, validate=False):
+        if validate:
+            if not os.path.exists(path):
+                return ""
+
         cdate = datetime.fromtimestamp(os.path.getmtime(path))
         cdate = cdate.replace(microsecond=0)
         cdate = cdate.strftime("%d.%m.%y,  %H:%M:%S")
@@ -2052,6 +2072,9 @@ License: GNU GPL-3.0-or-later<br>
     @property
     @err_catcher(name=__name__)
     def timeMeasure(self):
+        """
+        with self.core.timeMeasure:
+        """
         if not hasattr(self, "_timeMeasure"):
             self._timeMeasure = TimeMeasure()
 
@@ -2490,7 +2513,7 @@ License: GNU GPL-3.0-or-later<br>
         title = str(title or "Prism")
         buttons = buttons or ["Yes", "No"]
         icon = QMessageBox.Question if icon is None else icon
-        parent or getattr(self, "messageParent", None)
+        parent = parent or getattr(self, "messageParent", None)
 
         if "silent" in self.prismArgs or not self.uiAvailable:
             logger.info("%s - %s - %s" % (title, text, default))
@@ -2553,9 +2576,13 @@ License: GNU GPL-3.0-or-later<br>
         return msg
 
     class waitPopup(QObject):
+        """
+        with self.core.waitPopup(self.core, text):
+
+        """
         canceled = Signal()
 
-        def __init__(self, core, text, title=None, buttons=None, default=None, icon=None, hidden=False, parent=None, allowCancel=False):
+        def __init__(self, core, text, title=None, buttons=None, default=None, icon=None, hidden=False, parent=None, allowCancel=False, activate=True):
             self.core = core
             super(self.core.waitPopup, self).__init__()
             self.parent = parent
@@ -2566,6 +2593,7 @@ License: GNU GPL-3.0-or-later<br>
             self.icon = icon
             self.hidden = hidden
             self.allowCancel = allowCancel
+            self.activate = activate
             self.msg = None
 
         def __enter__(self):
@@ -2577,6 +2605,8 @@ License: GNU GPL-3.0-or-later<br>
 
         def createPopup(self):
             self.msg = self.core.popupNoButton(self.text, title=self.title, buttons=self.buttons, default=self.default, icon=self.icon, parent=self.parent, show=False)
+            if not self.activate:
+                self.msg.setAttribute(Qt.WA_ShowWithoutActivating)
 
         def show(self):
             self.createPopup()

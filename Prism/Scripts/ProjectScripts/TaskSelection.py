@@ -277,13 +277,11 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
                 if self.autoClose:
                     self.close()
                 elif self.handleImport:
-                    self.importFile()
+                    sm = self.core.getStateManager()
+                    sm.importFile(self.productPath)
 
     @err_catcher(name=__name__)
     def loadVersion(self, index, currentVersion=False):
-        if self.core.appPlugin.pluginName == "Standalone":
-            return
-
         if currentVersion:
             self.tw_versions.sortByColumn(0, Qt.DescendingOrder)
             pathC = self.tw_versions.model().columnCount() - 1
@@ -307,7 +305,8 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
                     self.closing = True
                     self.close()
                 elif self.handleImport:
-                    self.importFile()
+                    sm = self.core.getStateManager()
+                    sm.importFile(self.productPath)
 
     @err_catcher(name=__name__)
     def setProductPath(self, path):
@@ -320,19 +319,6 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
         self.productPath = path
         self.productPathSet.emit(path)
         return True
-
-    @err_catcher(name=__name__)
-    def importFile(self):
-        if not self.productPath:
-            return
-
-        extension = os.path.splitext(self.productPath)[1]
-        stateType = getattr(self.core.appPlugin, "sm_getImportHandlerType", lambda x: None)(extension) or "ImportFile"
-
-        sm = self.core.getStateManager()
-        sm.createState(stateType, importPath=self.productPath)
-        sm.setListActive(sm.tw_import)
-        sm.activateWindow()
 
     @err_catcher(name=__name__)
     def rclicked(self, pos, listType):
@@ -530,7 +516,7 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
                     entityItem = self.tw_shots.currentItem()
 
                 if entityItem and entityItem.data(0, Qt.UserRole):
-                    path = entityItem.data(0, Qt.UserRole)[0]
+                    path = entityItem.data(0, Qt.UserRole)[0]["path"]
 
         self.updateAssets()
         self.updateShots()
@@ -585,6 +571,7 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
         for basePath in assetPaths:
             for path in assetPaths[basePath]:
                 assetBase = self.core.assetPath.replace(self.core.projectPath, basePath)
+
                 relPath = path.replace(assetBase, "")
                 pathData = relPath.split(os.sep)[1:]
 
@@ -640,16 +627,15 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
     @err_catcher(name=__name__)
     def getFilteredAssetPaths(self, basePaths):
         filteredAssets = {}
-        assetPaths = self.core.entities.getAssetPaths()
 
         for ePath in basePaths:
             basePath = self.export_paths[ePath]
+            aPath = self.core.assetPath.replace(os.path.normpath(self.core.projectPath), basePath)
+            assetPaths = self.core.entities.getAssetPaths(path=aPath)
             if not basePath.endswith(os.sep):
                 basePath += os.sep
 
-            for aPath in assetPaths:
-                assetPath = self.core.paths.convertExportPath(aPath, "global", ePath)
-
+            for assetPath in assetPaths:
                 if self.core.entities.isAssetPathOmitted(assetPath):
                     continue
 
@@ -730,9 +716,8 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
         self.entityClicked()
 
     @err_catcher(name=__name__)
-    def updateTasks(self, item=None):
-        self.lw_tasks.clear()
-
+    def getTasks(self):
+        tasks = {}
         if self.tbw_entity.tabText(self.tbw_entity.currentIndex()) == "Assets":
             entityItem = self.tw_assets.currentItem()
         else:
@@ -744,12 +729,20 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
             ]
 
             tasks = self.core.products.getProductsFromPaths(taskPaths)
-            taskNames = sorted(tasks.keys(), key=lambda s: s.lower())
 
-            for tn in taskNames:
-                item = QListWidgetItem(tn.replace("_ShotCam", "ShotCam"))
-                item.setData(Qt.UserRole, tasks[tn])
-                self.lw_tasks.addItem(item)
+        return tasks
+
+    @err_catcher(name=__name__)
+    def updateTasks(self, item=None):
+        self.lw_tasks.clear()
+
+        tasks = self.getTasks()
+        taskNames = sorted(tasks.keys(), key=lambda s: s.lower())
+
+        for tn in taskNames:
+            item = QListWidgetItem(tn.replace("_ShotCam", "ShotCam"))
+            item.setData(Qt.UserRole, tasks[tn])
+            self.lw_tasks.addItem(item)
 
         if self.lw_tasks.count() > 0:
             self.lw_tasks.setCurrentRow(0)
@@ -960,7 +953,6 @@ class TaskSelection(QDialog, TaskSelection_ui.Ui_dlg_TaskSelection):
 
         if entityType == "asset":
             uielement = self.tw_assets
-            entityName = fileNameData[-4]
             self.tbw_entity.setCurrentIndex(0)
 
             itemPath = fileName.replace(aBase + os.sep, "")

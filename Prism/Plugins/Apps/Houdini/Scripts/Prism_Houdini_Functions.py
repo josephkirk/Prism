@@ -81,9 +81,16 @@ class Prism_Houdini_Functions(object):
             ".otlnc",
             ".otllc",
         ]
+        self.whiteListedExternalFiles = [
+            {
+                "nodeType": "topnet",
+                "parmName": "taskgraphfile",
+            },
+        ]
         self.ropLocation = "/out"
         self.filecache = Prism_Houdini_Node_Filecache.Prism_Houdini_Filecache(self.plugin)
         self.importFile = Prism_Houdini_Node_ImportFile.Prism_Houdini_ImportFile(self.plugin)
+        self.nodeTypeAPIs = [self.filecache, self.importFile]
         self.callbacks = []
         self.registerCallbacks()
 
@@ -812,7 +819,8 @@ class Prism_Houdini_Functions(object):
 
             if val is not None:
                 node.parm(parm).set(val)
-        except:
+        except Exception as e:
+            logger.debug(str(e))
             if not node.parm(parm):
                 msg = "parm doesn't exist: \"%s\" on node \"%s\"" % (parm, node.path())
                 if severity == "warning":
@@ -1106,12 +1114,16 @@ class Prism_Houdini_Functions(object):
             ]:
                 continue
 
-            if (
-                x[0] is not None
-                and x[0].name() in ["taskgraphfile"]
-                and x[0].node().type().name()
-                in ["topnet"]
-            ):
+            doContinue = False
+            for whiteListed in self.whiteListedExternalFiles:
+                if (
+                    x[0] and x[0].name() == whiteListed["parmName"]
+                    and x[0].node().type().name() == whiteListed["nodeType"]
+                ):
+                    doContinue = True
+                    break
+
+            if doContinue:
                 continue
 
             if (
@@ -1149,6 +1161,7 @@ class Prism_Houdini_Functions(object):
             if self.core.sm.stateTypes["Save HDA"].canConnectNode():
                 msg = "The selected node can be connected to a \"Save HDA\" state.\nDo you want to create a \"Save HDA\" state?"
                 result = self.core.popupQuestion(msg, parent=self.core.sm)
+                self.core.sm.activateWindow()
                 if result == "Yes":
                     return "Save HDA"
 
@@ -1163,6 +1176,36 @@ class Prism_Houdini_Functions(object):
             return True
         except:
             return False
+
+    @err_catcher(name=__name__)
+    def getCamNodes(self, origin, cur=False):
+        sceneCams = []
+        for node in hou.node("/").allSubChildren():
+            if (
+                node.type().name() == "cam" and node.name() != "ipr_camera"
+            ) or node.type().name() == "vrcam":
+                sceneCams.append(node)
+
+        if cur:
+            sceneCams = ["Current View"] + sceneCams
+
+        return sceneCams
+
+    @err_catcher(name=__name__)
+    def getCamName(self, origin, handle):
+        if handle == "Current View":
+            return handle
+
+        if self.core.isStr(handle):
+            name = [x.name() for x in self.getCamNodes(origin) if x.name() == handle]
+            if not name:
+                return "invalid"
+            else:
+                name = name[0]
+        else:
+            name = handle.name()
+
+        return name
 
     @err_catcher(name=__name__)
     def sm_createRenderPressed(self, origin):
@@ -1489,6 +1532,9 @@ class Prism_Houdini_Functions(object):
             if node and node.path() == knode.path():
                 return state
 
+        if getattr(sm, "stateInCreation", None):
+            return sm.stateInCreation
+
         state = self.createStateForNode(kwargs)
         return state
 
@@ -1500,6 +1546,11 @@ class Prism_Houdini_Functions(object):
             QCoreApplication.processEvents()
 
         state = self.getStateFromNode(kwargs)
+        parent = state.parent()
+        while parent:
+            parent.setExpanded(True)
+            parent = parent.parent()
+
         sm.selectState(state)
 
     @err_catcher(name=__name__)
@@ -1512,35 +1563,63 @@ class Prism_Houdini_Functions(object):
         pass
 
     @err_catcher(name=__name__)
+    def getApiFromNode(self, node):
+        for api in self.nodeTypeAPIs:
+            validApi = self.isValidNodeApi(node, api)
+
+            if validApi:
+                return api
+
+    @err_catcher(name=__name__)
     def onNodeDeleted(self, kwargs):
         if hou.hipFile.isLoadingHipFile() or hou.hipFile.isShuttingDown():
             return
 
         state = self.getStateFromNode(kwargs)
-        if kwargs["node"].type().name().startswith(self.importFile.getTypeName()):
-            parent = self.importFile.getParentFolder(create=False)
-        elif kwargs["node"].type().name().startswith(self.filecache.getTypeName()):
-            parent = self.filecache.getParentFolder(create=False)
+        parent = None
+        api = self.getApiFromNode(kwargs["node"])
+        if api:
+            parent = api.getParentFolder(create=False, node=kwargs["node"])
 
         sm = self.core.getStateManager()
         sm.deleteState(state, silent=True)
-        if parent and parent.childCount() == 0:
-            sm.deleteState(parent)
+        while parent:
+            if parent and parent.childCount() == 0:
+                newParent = parent.parent()
+                sm.deleteState(parent)
+                parent = newParent
+            else:
+                break
+
+    @err_catcher(name=__name__)
+    def isValidNodeApi(self, node, api):
+        validApi = False
+        typeName = api.getTypeName()
+        if isinstance(typeName, list):
+            typeNames = typeName
+        else:
+            typeNames = [typeName]
+
+        for name in typeNames:
+            validApi = node.type().name().startswith(name)
+            if validApi:
+                break
+
+        return validApi
 
     @err_catcher(name=__name__)
     def createStateForNode(self, kwargs):
         sm = self.core.getStateManager()
 
-        if kwargs["node"].type().name().startswith(self.importFile.getTypeName()):
-            parent = self.importFile.getParentFolder()
+        parent = None
+        api = self.getApiFromNode(kwargs["node"])
+        if api:
+            parent = api.getParentFolder(create=False, node=kwargs["node"])
             if parent:
                 parentExpanded = parent.isExpanded()
-            state = sm.createState("ImportFile", node=kwargs["node"], setActive=True, openProductsBrowser=False, parent=parent)
-        elif kwargs["node"].type().name().startswith(self.filecache.getTypeName()):
-            parent = self.filecache.getParentFolder()
-            if parent:
-                parentExpanded = parent.isExpanded()
-            state = sm.createState("Export", node=kwargs["node"], setActive=True, parent=parent)
+
+            openBrowser = False if api.listType == "Import" else None
+            state = sm.createState(api.stateType, node=kwargs["node"], setActive=True, openProductsBrowser=openBrowser, parent=parent)
 
         if parent:
             parent.setExpanded(parentExpanded)
@@ -1566,3 +1645,7 @@ class Prism_Houdini_Functions(object):
         convertedFilename = ".".join(convertedParts) + ext
         convertedPath = os.path.join(folder, convertedFilename).replace("\\", "/")
         return convertedPath
+
+    @err_catcher(name=__name__)
+    def handleNetworkDrop(self, fileList):
+        return False

@@ -323,6 +323,11 @@ class MediaProducts(object):
         return infoPath
 
     @err_catcher(name=__name__)
+    def getPlayblastVersionInfoPathFromFilepath(self, path):
+        infoPath = os.path.join(os.path.dirname(path), "versioninfo.yml")
+        return infoPath
+
+    @err_catcher(name=__name__)
     def getMediaVersionInfoPath(self, basepath, product, version):
         if version.endswith(" (local)"):
             basepath = self.core.convertPath(basepath, target="local")
@@ -649,7 +654,8 @@ class MediaProducts(object):
             if not os.path.exists(os.path.dirname(masterFile)):
                 os.makedirs(os.path.dirname(masterFile))
 
-            if platform.system() == "Windows" and drive == masterDrive:
+            useHL = self.core.getConfig("globals", "useHardLinksForMasterVersions", config="project", dft=False)
+            if platform.system() == "Windows" and drive == masterDrive and useHL:
                 self.core.createSymlink(masterFile, file)
             else:
                 shutil.copy2(file, masterFile)
@@ -686,7 +692,7 @@ class MediaProducts(object):
     @err_catcher(name=__name__)
     def getVersionPathsFromMaster(self, path, isFilepath=True):
         infoPath = self.getMediaVersionInfoPathFromFilepath(path)
-        paths = self.core.getConfig("versionpaths", configPath=infoPath)
+        paths = self.core.getConfig("versionpaths", configPath=infoPath) or []
         return paths
 
     @err_catcher(name=__name__)

@@ -1652,15 +1652,26 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
             rcmenu.addAction(current)
             emp = QMenu("Create new version from preset", self)
             scenes = self.core.entities.getPresetScenes()
+            dirMenus = {}
             for scene in scenes:
                 base, ext = os.path.splitext(scene)
-                empAct = QAction(base, self)
-                empAct.triggered.connect(
-                    lambda y=None, x=tabName, fname=scene: self.createEmptyScene(
-                        x, fname
-                    )
-                )
-                emp.addAction(empAct)
+                folders = base.split("/")
+                curPath = ""
+                for idx, folder in enumerate(folders):
+                    if idx == (len(folders)-1):
+                        empAct = QAction(folder, self)
+                        empAct.triggered.connect(
+                            lambda y=None, x=tabName, fname=scene: self.createEmptyScene(
+                                x, fname
+                            )
+                        )
+                        dirMenus.get(curPath, emp).addAction(empAct)
+                    else:
+                        curMenu = dirMenus.get(curPath, emp)
+                        curPath = os.path.join(curPath, folder)
+                        if curPath not in dirMenus:
+                            dirMenus[curPath] = QMenu(folder, self)
+                            curMenu.addMenu(dirMenus[curPath])
 
             newPreset = QAction("< Create new preset from current >", self)
             newPreset.triggered.connect(self.core.entities.createPresetScene)
@@ -2178,17 +2189,25 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
     def refreshAHierarchy(self, load=False):
         self.tw_aHierarchy.blockSignals(True)
         self.tw_aHierarchy.clear()
-        self.tw_aHierarchy.blockSignals(False)
 
         if self.e_assetSearch.isVisible():
             assets, folders = self.core.entities.getAssetPaths(returnFolders=True, depth=0)
             filterStr = self.e_assetSearch.text()
             self.filteredAssets = []
             self.filteredAssets += self.core.entities.filterAssets(assets, filterStr)
+            assetFolders = []
+            for fasset in self.filteredAssets:
+                fasset = os.path.dirname(fasset)
+                while fasset != self.core.assetPath:
+                    assetFolders.append(fasset)
+                    fasset = os.path.dirname(fasset)
+
+            self.filteredAssets += assetFolders
             self.filteredAssets += self.core.entities.filterAssets(folders, filterStr)
 
         self.refreshAssets()
         self.tw_aHierarchy.resizeColumnToContents(0)
+        self.tw_aHierarchy.blockSignals(False)
 
         if self.tw_aHierarchy.topLevelItemCount() > 0 and not self.e_assetSearch.isVisible():
             self.tw_aHierarchy.setCurrentItem(self.tw_aHierarchy.topLevelItem(0))
@@ -2206,31 +2225,31 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
 
         assets = self.core.entities.filterOmittedAssets(assets)
         folders = self.core.entities.filterOmittedAssets(folders)
-
         if self.e_assetSearch.isVisible():
             filteredAssets = []
+
             for asset in assets:
-                for fasset in self.filteredAssets:
-                    if (asset == fasset or asset + os.sep in fasset) and asset not in filteredAssets:
-                        filteredAssets.append(asset)
+                if asset in self.filteredAssets:
+                    filteredAssets.append(asset)
 
             assets = filteredAssets
 
             filteredFolders = []
             for folder in folders:
-                for fasset in self.filteredAssets:
-                    if (folder == fasset or folder + os.sep in fasset) and folder not in filteredFolders:
-                        filteredFolders.append(folder)
+                if folder in self.filteredAssets:
+                    filteredFolders.append(folder)
 
             folders = filteredFolders
 
         itemPaths = copy.copy(assets)
         itemPaths += folders
+
         for path in sorted(itemPaths):
             if path in assets:
                 pathType = "asset"
             else:
                 pathType = "folder"
+
             self.addAssetItem(path, itemType=pathType, parent=parent, refreshItem=refreshChildren)
 
     @err_catcher(name=__name__)
@@ -2249,19 +2268,21 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
         item.takeChildren()
         path = item.text(1)
         itemType = item.text(2)
+        expand = path in self.aExpanded or (self.e_assetSearch.isVisible() and self.e_assetSearch.text())
 
         if itemType == "asset":
             item.setText(2, "asset")
         else:
             item.setText(2, "folder")
-            self.refreshAssets(path=path, parent=item, refreshChildren=False)
+            refreshChildren = expand and self.tw_aHierarchy.signalsBlocked()
+            self.refreshAssets(path=path, parent=item, refreshChildren=refreshChildren)
 
         if itemType == "asset":
             iFont = item.font(0)
             iFont.setBold(True)
             item.setFont(0, iFont)
 
-        if path in self.aExpanded or (self.e_assetSearch.isVisible() and self.e_assetSearch.text()):
+        if expand:
             item.setExpanded(True)
 
     @err_catcher(name=__name__)
@@ -4793,7 +4814,8 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
         for file in files:
             kwargs["extension"] = os.path.splitext(file)[1]
             targetPath = self.core.paths.generateScenePath(**kwargs)
-            targetPath = self.core.convertPath(targetPath, target="local")
+            if self.core.useLocalFiles:
+                targetPath = self.core.convertPath(targetPath, target="local")
 
             if not os.path.exists(os.path.dirname(targetPath)):
                 try:

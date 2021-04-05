@@ -639,18 +639,22 @@ class ProjectEntities(object):
                     break
 
     @err_catcher(name=__name__)
-    def renameShot(self, curShotName, newShotName):
-        shotFolder = self.core.getEntityPath(shot=curShotName)
-        newShotFolder = self.core.getEntityPath(shot=newShotName)
-        shotFolders = {shotFolder: newShotFolder}
+    def renameShot(self, curShotName, newShotName, locations=None):
+        shotFolder = os.path.normpath(self.core.getEntityPath(shot=curShotName))
+        newShotFolder = os.path.normpath(self.core.getEntityPath(shot=newShotName))
+        shotFolders = {}
+        if not locations or "global" in locations:
+            shotFolders[shotFolder] = newShotFolder
+
         if self.core.useLocalFiles:
-            lShotFolder = shotFolder.replace(
-                self.core.projectPath, self.core.localProjectPath
-            )
-            newLShotFolder = newShotFolder.replace(
-                self.core.projectPath, self.core.localProjectPath
-            )
-            shotFolders[lShotFolder] = newLShotFolder
+            if not locations or "local" in locations:
+                lShotFolder = shotFolder.replace(
+                    self.core.projectPath, self.core.localProjectPath
+                )
+                newLShotFolder = newShotFolder.replace(
+                    self.core.projectPath, self.core.localProjectPath
+                )
+                shotFolders[lShotFolder] = newLShotFolder
 
         while True:
             try:
@@ -982,7 +986,10 @@ class ProjectEntities(object):
     def getHighestTaskVersion(self, dstname, getExisting=False, ignoreEmpty=False):
         taskDirs = []
         dstname = os.path.normpath(dstname)
-        outPaths = self.core.paths.getExportProductBasePaths().values()
+        if os.path.normpath("Rendering/3dRender") in dstname or os.path.normpath("Rendering/2dRender") in dstname:
+            outPaths = self.core.paths.getRenderProductBasePaths().values()
+        else:
+            outPaths = self.core.paths.getExportProductBasePaths().values()
 
         for path in outPaths:
             dstname = dstname.replace(path, self.core.projectPath)
@@ -1180,11 +1187,21 @@ class ProjectEntities(object):
         presetScenes = []
         emptyDir = os.path.join(os.path.dirname(self.core.prismIni), "EmptyScenes")
         if os.path.exists(emptyDir):
-            for filename in sorted(os.listdir(emptyDir)):
-                if filename == "readme.txt":
-                    continue
+            for root, folders, files in os.walk(emptyDir):
+                for filename in sorted(files):
+                    if filename == "readme.txt":
+                        continue
 
-                presetScenes.append(filename)
+                    if filename.startswith(".") or filename.startswith("_"):
+                        continue
+
+                    presetDir = root.replace(emptyDir, "")
+                    if presetDir:
+                        presetName = presetDir[1:].replace("\\", "/") + "/" + filename
+                    else:
+                        presetName = filename
+
+                    presetScenes.append(presetName)
 
         return presetScenes
 

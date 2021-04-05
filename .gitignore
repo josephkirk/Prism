@@ -2,3 +2,4 @@ Prism/PythonLibs
 Prism/Python37
 *.pyc
 Tools
+*.idea

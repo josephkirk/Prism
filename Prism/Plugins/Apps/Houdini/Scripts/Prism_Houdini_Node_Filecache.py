@@ -52,6 +52,11 @@ class Prism_Houdini_Filecache(object):
     def __init__(self, plugin):
         self.plugin = plugin
         self.core = self.plugin.core
+        self.initState = None
+        self.executeBackground = False
+        self.nodeExecuted = False
+        self.stateType = "Export"
+        self.listType = "Export"
 
     @err_catcher(name=__name__)
     def getTypeName(self):
@@ -74,9 +79,18 @@ class Prism_Houdini_Filecache(object):
 
     @err_catcher(name=__name__)
     def getLocations(self, kwargs):
-        state = self.getStateFromNode(kwargs)
+        # if function gets called before scene is fully loaded
+        sm = self.core.getStateManager(create=False)
+        if not sm or self.core.getCurrentFileName() != sm.scenename:
+            return []
+
+        if self.initState:
+            state = self.initState
+        else:
+            state = self.getStateFromNode(kwargs)
+
         cb = state.ui.cb_outPath
-        locations = [cb.itemText(idx) for idx in range(cb.count())] 
+        locations = [cb.itemText(idx) for idx in range(cb.count())]
 
         tokens = []
         for loc in locations:
@@ -113,13 +127,14 @@ class Prism_Houdini_Filecache(object):
     def onNodeCreated(self, kwargs):
         self.plugin.onNodeCreated(kwargs)
         kwargs["node"].setColor(hou.Color(0.95, 0.5, 0.05))
-        self.nodeInit(kwargs["node"])
+        self.getStateFromNode(kwargs)
 
     @err_catcher(name=__name__)
     def nodeInit(self, node, state=None):
         if not state:
             state = self.getStateFromNode({"node": node})
 
+        self.initState = state
         location = node.parm("format").evalAsString()
         task = node.parm("task").eval()
         outformat = node.parm("format").evalAsString()
@@ -129,6 +144,7 @@ class Prism_Houdini_Filecache(object):
         state.ui.setOutputType(outformat)
         state.ui.setLocation(location)
         self.updateLatestVersion(node)
+        self.initState = None
 
     @err_catcher(name=__name__)
     def onNodeDeleted(self, kwargs):
@@ -195,25 +211,39 @@ class Prism_Houdini_Filecache(object):
         else:
             ropName = "write_geo"
 
+        if self.executeBackground:
+            parmName = "executebackground"
+        else:
+            parmName = "execute"
+
         rop = node.node(ropName)
-        rop.parm("execute").pressButton()
+        rop.parm(parmName).pressButton()
         QCoreApplication.processEvents()
         self.updateLatestVersion(node)
         node.node("switch_abc").cook(force=True)
-        if node.parm("showSuccessPopup").eval():
+        if not self.executeBackground and node.parm("showSuccessPopup").eval() and self.nodeExecuted:
             self.core.popup("Finished caching successfully.", severity="info", modal=False)
 
+        if self.executeBackground:
+            return "background"
+        else:
+            return True
+
     @err_catcher(name=__name__)
-    def executePressed(self, kwargs):
+    def executePressed(self, kwargs, background=False):
         if not kwargs["node"].inputs():
             self.core.popup("No inputs connected")
             return
 
         sm = self.core.getStateManager()
         state = self.getStateFromNode(kwargs)
+        sanityChecks = bool(kwargs["node"].parm("sanityChecks").eval())
         version = self.getWriteVersionFromNode(kwargs["node"])
         saveScene = bool(kwargs["node"].parm("saveScene").eval())
         incrementScene = saveScene and bool(kwargs["node"].parm("incrementScene").eval())
+
+        self.nodeExecuted = True
+        self.executeBackground = background
         sm.publish(
             executeState=True,
             useVersion=version,
@@ -221,7 +251,11 @@ class Prism_Houdini_Filecache(object):
             successPopup=False,
             saveScene=saveScene,
             incrementScene=incrementScene,
+            sanityChecks=sanityChecks,
+            versionWarning=False,
         )
+        self.executeBackground = False
+        self.nodeExecuted = False
         self.reload(kwargs)
 
     @err_catcher(name=__name__)
@@ -273,7 +307,7 @@ class Prism_Houdini_Filecache(object):
             node.parm("readVersion").set(latestVersion)
 
     @err_catcher(name=__name__)
-    def getParentFolder(self, create=True):
+    def getParentFolder(self, create=True, node=None):
         sm = self.core.getStateManager()
         for state in sm.states:
             if state.ui.listType != "Export" or state.ui.className != "Folder":
@@ -289,7 +323,7 @@ class Prism_Houdini_Filecache(object):
                 "statename": "Filecaches",
                 "listtype": "Export",
                 "stateenabled": "PySide2.QtCore.Qt.CheckState.Checked",
-                "stateexpanded": False,
+                "stateexpanded": True,
             }
             state = sm.createState("Folder", stateData=stateData)
             return state
@@ -346,9 +380,17 @@ class Prism_Houdini_Filecache(object):
         return version
 
     @err_catcher(name=__name__)
+    def getProductName(self, node):
+        return node.parm("task").eval()
+
+    @err_catcher(name=__name__)
     def getImportPath(self):
+        sm = self.core.getStateManager(create=False)
+        if not sm or self.core.getCurrentFileName() != sm.scenename:
+            return ""
+
         node = hou.pwd()
-        product = node.parm("task").eval()
+        product = self.getProductName(node)
         version = self.getReadVersionFromNode(node)
         if version == "latest":
             path = self.core.products.getLatestVersionpathFromProduct(product)
@@ -372,6 +414,7 @@ class Prism_Houdini_Filecache(object):
         if data["entity"] == "invalid":
             return names
         names = self.core.products.getProductsFromEntity(data["entity"], data["fullEntityName"])
+        names = sorted(names.keys())
         names = [name for name in names for _ in range(2)]
         return names
 
@@ -390,6 +433,17 @@ class Prism_Houdini_Filecache(object):
         return ranges
 
     @err_catcher(name=__name__)
+    def getFrameRange(self, node):
+        if node.parm("framerange").eval() == 0:
+            startFrame = self.core.appPlugin.getCurrentFrame()
+            endFrame = startFrame
+        else:
+            startFrame = node.parm("f1").eval()
+            endFrame = node.parm("f2").eval()
+
+        return startFrame, endFrame
+
+    @err_catcher(name=__name__)
     def framerangeChanged(self, kwargs):
         state = self.getStateFromNode(kwargs)
         state.ui.updateUi()
@@ -400,10 +454,16 @@ class Prism_Houdini_Filecache(object):
         version = self.getWriteVersionFromNode(node)
         if version == "next":
             version += " (%s)" % (self.core.versionFormat % node.parm("writeVersion").eval())
-        descr = node.parm("task").eval() + "\n" + version
+        descr = self.getProductName(node) + "\n" + version
 
         if not node.parm("latestVersionRead").eval():
             readv = self.core.versionFormat % node.parm("readVersion").eval()
             descr += "\nRead: " + readv
 
         return descr
+
+    @err_catcher(name=__name__)
+    def isSingleFrame(self, node):
+        rangeType = node.parm("framerange").evalAsString()
+        isSingle = rangeType == "Save Current Frame"
+        return isSingle

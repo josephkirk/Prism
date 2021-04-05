@@ -39,7 +39,17 @@ if not prismRoot:
     prismRoot = PRISMROOT
 
 sys.path.append(os.path.join(prismRoot, "Scripts"))
-sys.path.append(os.path.join(prismRoot, "PythonLibs", "Python37", "PySide"))
+
+if sys.version[0] == "2":
+    sys.path.append(os.path.join(prismRoot, "PythonLibs", "Python27"))
+    sys.path.append(os.path.join(prismRoot, "PythonLibs", "Python27", "PySide"))
+else:
+    sys.path.append(os.path.join(prismRoot, "PythonLibs", "Python37"))
+    sys.path.append(os.path.join(prismRoot, "PythonLibs", "Python37", "PySide"))
+
+# Fix for imageio to work
+sys.path.insert(0, os.path.join(prismRoot, "PythonLibs/CrossPlatform"))
+import imageio  # nopep8
 
 try:
     from PySide2.QtCore import *
@@ -53,16 +63,23 @@ qapp = QApplication.instance()
 if qapp == None:
     qapp = QApplication(sys.argv)
 
-
-import PrismCore
+import PrismCore  # nopep8
 
 pcore = PrismCore.PrismCore(app="Fusion")
 pcore.appPlugin.fusion = fusion
 
-curPrj = pcore.getConfig("globals", "current project")
-if curPrj is not None and curPrj != "":
-    pcore.changeProject(curPrj, openUi="projectBrowser")
-else:
-    pcore.projects.setProject(openUi="projectBrowser")
+doOpen = True
+try:
+    if scriptlib is True and pcore.getConfig("fusion", "openprism") is False:
+        doOpen = False
+except:
+    pass
 
-qapp.exec_()
+if doOpen:
+    curPrj = pcore.getConfig("globals", "current project")
+    if curPrj is not None and curPrj != "":
+        pcore.changeProject(curPrj, openUi="projectBrowser")
+    else:
+        pcore.projects.setProject(openUi="projectBrowser")
+
+    qapp.exec_()
