@@ -1724,7 +1724,7 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
         rcmenu.addAction(copAct)
 
         self.core.callback(
-            name="openPBFileContextMenu", types=["custom"], args=[self, rcmenu, idx]
+            name="openPBFileContextMenu", types=["custom"], args=[self, rcmenu, filepath]
         )
 
         rcmenu.exec_((tw.viewport()).mapToGlobal(pos))
