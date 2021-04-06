@@ -105,7 +105,7 @@ class ConfigManager(object):
             return os.path.join(
                 os.path.dirname(self.core.prismIni), "Assetinfo", "assetInfo.yml"
             )
-        elif config == "assetinfo":
+        elif config == "sequenceinfo":
             return os.path.join(
                 os.path.dirname(self.core.prismIni), "Sequenceinfo", "sequenceInfo.yml"
             )

@@ -63,6 +63,28 @@ from PrismUtils.Decorators import err_catcher as err_catcher
 
 logger = logging.getLogger(__name__)
 
+import pymel.core as pm
+
+def fixMayaCallBug():
+    """
+    This will iterate all modelPanels and remove the "CgAbBlastPanelOptChangeCallback"
+    As such, after running this the following error should be fixed:
+        // Error: line 1: Cannot find procedure "CgAbBlastPanelOptChangeCallback". //
+    """
+
+    from maya import cmds
+
+    for model_panel in cmds.getPanel(typ="modelPanel"):
+        
+        # Get callback of the model editor
+        callback = cmds.modelEditor(model_panel, query=True, editorChanged=True)
+        
+        # If the callback is the erroneous `CgAbBlastPanelOptChangeCallback`
+        if callback == "CgAbBlastPanelOptChangeCallback":
+            
+            # Remove the callbacks from the editor
+            cmds.modelEditor(model_panel, edit=True, editorChanged="")
+
 def export_anim(root, exportPath, rootnode_name=None):
 
     create_nodes = []
@@ -114,6 +136,14 @@ def export_anim(root, exportPath, rootnode_name=None):
                 pm.parentConstraint(source_node, copied_node)
             except Exception as why:
                 logger.info("Failed to parent constrain {}.\n {}".format(source_node, copied_node))
+
+			if hasattr(source_node, "getShape"):
+                if isinstance(source_node.getShape(), pm.nt.Camera):
+                    source_cam_shape = source_node.getShape()
+                    target_cam_shape = copied_node.getShape()
+                    for atr in source_cam_shape.listAttr(k=True):
+                        target_cam_shape.attr(atr.longName()).unlock()
+                        atr >> target_cam_shape.attr(atr.longName())
             # for i in pm.listConnections(t,type="dagPose"):
             #     pm.select(i.listConnections(type="skinCluster"),add=True)
         
@@ -292,6 +322,11 @@ class Prism_Maya_Functions(object):
     def sceneOpen(self, origin):
         if hasattr(origin, "asThread") and origin.asThread.isRunning():
             origin.startasThread()
+        try:
+            fixMayaCallBug()
+        except:
+            pass
+        
 
     @err_catcher(name=__name__)
     def executeScript(self, origin, code, execute=False, logErr=True):
@@ -2629,9 +2664,9 @@ Show only polygon objects in viewport.
             origin.stateManager.saveStatesToScene
         )
         if platform.system() == "Windows":
-            origin.cb_formats.addItem("avi (with audio)")
+            origin.cb_formats.addItem(".avi")
 
-        origin.cb_formats.addItem("qt (with audio)")
+        origin.cb_formats.addItem(".mov")
 
     @err_catcher(name=__name__)
     def sm_playblast_loadData(self, origin, data):
@@ -2707,10 +2742,10 @@ Show only polygon objects in viewport.
         outputName = outputName[:-5]
 
         selFmt = origin.cb_formats.currentText()
-        if selFmt == "avi (with audio)":
+        if selFmt == ".avi":
             fmt = "avi"
             outputName += ".avi"
-        elif selFmt == "qt (with audio)":
+        elif selFmt == ".mov":
             fmt = "qt"
             outputName += ".mov"
         else:
