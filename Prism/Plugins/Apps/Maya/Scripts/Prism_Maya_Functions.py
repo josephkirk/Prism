@@ -63,8 +63,6 @@ from PrismUtils.Decorators import err_catcher as err_catcher
 
 logger = logging.getLogger(__name__)
 
-import pymel.core as pm
-
 def fixMayaCallBug():
     """
     This will iterate all modelPanels and remove the "CgAbBlastPanelOptChangeCallback"
@@ -85,68 +83,69 @@ def fixMayaCallBug():
             # Remove the callbacks from the editor
             cmds.modelEditor(model_panel, edit=True, editorChanged="")
 
-def export_anim(root, exportPath, rootnode_name=None):
+def export_anim(roots, exportPath, start_frame, end_frame, rootnode_name=None):
 
     create_nodes = []
-    rootnode = None
-    export_node = None
-    cam_export = False
+    exportPath = os.path.abspath(exportPath).replace("\\","/")
+    logger.debug(exportPath)
     try:
-        source_node_root = pm.PyNode(root)
-        if isinstance(source_node_root.getShape(), pm.nt.Camera):
-            cam_export = True
-            targetParent = None
-        else:
-            targetParent = source_node_root.getParent()
+        for root in roots:
+            rootnode = None
+            export_node = None
+            cam_export = False
+            source_node_root = pm.PyNode(root)
+            if isinstance(source_node_root.getShape(), pm.nt.Camera):
+                cam_export = True
+                targetParent = None
+            else:
+                targetParent = source_node_root.getParent()
 
-        if not rootnode_name and targetParent:
-            rootnode_name = targetParent.nodeName()
+            if not rootnode_name and targetParent:
+                rootnode_name = targetParent.nodeName()
 
-        if rootnode_name:
-            rootnode = pm.nt.Transform(name=rootnode_name)
-            create_nodes.append(rootnode)
-            export_node = rootnode
+            if rootnode_name:
+                rootnode = pm.nt.Transform(name=rootnode_name)
+                create_nodes.append(rootnode)
+                export_node = rootnode
 
-        target_name = source_node_root.namespace()
-        duplicated_node = source_node_root.duplicate()
-        duplicated_node = duplicated_node[0]
-        duplicated_node.setParent(rootnode)
-        try:
-            duplicated_node.rename(source_node_root.nodeName())
-        except:
-            pass
-        targethi = [(i,t) for i,t in zip(source_node_root.getChildren(ad=True), duplicated_node.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
-        targethi.append((source_node_root, duplicated_node))
-        exportPath = os.path.abspath(os.path.join(exportPath,target_name.replace(":","_"))).replace("\\","/")
-        
-        if not export_node:
-            export_node = duplicated_node
-            create_nodes.append(export_node)
-        pm.select(export_node, hi=True, r=True)
-        for source_node, copied_node in targethi:
-            logger.info("Link {} to {}".format(source_node, copied_node))
-            for atr in source_node.listAttr(k=True):
-                try:
-                    target_attr = copied_node.attr(atr.longName())
-                    target_attr.unlock()
-                    atr >> target_attr
-                except Exception as why:
-                    logger.info("Failed to connect {}.\n {}".format(atr.longName(), why))
+            target_name = source_node_root.namespace()
+            duplicated_node = source_node_root.duplicate()
+            duplicated_node = duplicated_node[0]
+            duplicated_node.setParent(rootnode)
             try:
-                pm.parentConstraint(source_node, copied_node)
-            except Exception as why:
-                logger.info("Failed to parent constrain {}.\n {}".format(source_node, copied_node))
-
-			if hasattr(source_node, "getShape"):
-                if isinstance(source_node.getShape(), pm.nt.Camera):
-                    source_cam_shape = source_node.getShape()
-                    target_cam_shape = copied_node.getShape()
-                    for atr in source_cam_shape.listAttr(k=True):
-                        target_cam_shape.attr(atr.longName()).unlock()
-                        atr >> target_cam_shape.attr(atr.longName())
-            # for i in pm.listConnections(t,type="dagPose"):
-            #     pm.select(i.listConnections(type="skinCluster"),add=True)
-        
+                duplicated_node.rename(source_node_root.nodeName())
+            except:
+                pass
+            targethi = [(i,t) for i,t in zip(source_node_root.getChildren(ad=True), duplicated_node.getChildren(ad=True)) if isinstance(i, pm.nt.Joint)]
+            targethi.append((source_node_root, duplicated_node))
+            
+            if not export_node:
+                export_node = duplicated_node
+                create_nodes.append(export_node)
+            # pm.select(export_node, hi=True, r=True)
+            for source_node, copied_node in targethi:
+                if hasattr(source_node, "getShape"):
+                    if isinstance(source_node.getShape(), pm.nt.Camera):
+                        source_cam_shape = source_node.getShape()
+                        target_cam_shape = copied_node.getShape()
+                        for atr in source_cam_shape.listAttr(k=True):
+                            target_cam_shape.attr(atr.longName()).unlock()
+                            atr >> target_cam_shape.attr(atr.longName())
+                logger.info("Link {} to {}".format(source_node, copied_node))
+                for atr in source_node.listAttr(k=True):
+                    try:
+                        target_attr = copied_node.attr(atr.longName())
+                        target_attr.unlock()
+                        atr >> target_attr
+                    except Exception as why:
+                        logger.info("Failed to connect {}.\n {}".format(atr.longName(), why))
+                try:
+                    pm.parentConstraint(source_node, copied_node)
+                except Exception as why:
+                    logger.info("Failed to parent constrain {}.\n {}".format(source_node, copied_node))
+                # for i in pm.listConnections(t,type="dagPose"):
+                #     pm.select(i.listConnections(type="skinCluster"),add=True)
+            
         try:
             if os.path.exists(exportPath):
                 os.remove(exportPath)
@@ -154,9 +153,10 @@ def export_anim(root, exportPath, rootnode_name=None):
         except:
             pass
         import maya.mel
+        pm.select(create_nodes, r=True, hi=True)
         pm.refresh() # Dump Maya , you Stupid AF
         maya.mel.eval('FBXResetExport')
-        maya.mel.eval('FBXExportFileVersion -v FBX201600;')
+        maya.mel.eval('FBXExportFileVersion -v FBX201800;')
         maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|UnitsSelector" -v Centimeters;')
         maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|DynamicScaleConversion" -v true;')
         maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation" -v 1;')
@@ -164,27 +164,27 @@ def export_anim(root, exportPath, rootnode_name=None):
         maya.mel.eval('FBXExportBakeResampleAnimation -v 0;')
         maya.mel.eval('FBXExportBakeComplexStep -v 1;')
         maya.mel.eval('FBXExportQuaternion -v quaternion;')
-        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(pm.playbackOptions(q=True, ast=True)))
-        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(pm.playbackOptions(q=True, aet=True)))
+        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(start_frame))
+        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(end_frame))
         maya.mel.eval('FBXExportConstraints -v 0;')
         maya.mel.eval('FBXExportEmbeddedTextures -v 0;')
         maya.mel.eval('FBXExportUpAxis z;')
+        maya.mel.eval('FBXExportInputConnections  -v 0;')
+        # maya.mel.eval('FBXExportInAscii -v 1;')
+        maya.mel.eval('FBXExportApplyConstantKeyReducer -v 0;')
         if cam_export:
-            maya.mel.eval('FBXExportCamera -v 1;')
+            maya.mel.eval('FBXExportCameras -v 1;')
         else:
             maya.mel.eval('FBXExportSkins -v 1;')
             maya.mel.eval('FBXExportSkeletonDefinitions -v 1;')
             maya.mel.eval('FBXExportShapes -v 1;')
             maya.mel.eval('FBXExportReferencedAssetsContent -v 1;')
-            maya.mel.eval('FBXExportInputConnections  -v 0;')
-            maya.mel.eval('FBXExportInAscii -v 1;')
-            maya.mel.eval('FBXExportApplyConstantKeyReducer -v 0;')
             maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|Deformation" -v 1;')
             maya.mel.eval('FBXProperty "Export|IncludeGrp|BindPose" -v 1;')
             maya.mel.eval('FBXProperty "Export|IncludeGrp|InputConnectionsGrp|IncludeChildren" -v 1;')
             maya.mel.eval('FBXProperty "Export|IncludeGrp|Geometry|Triangulate" -v 1;')
             maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|HideComplexAnimationBakedWarning" -v 1;')
-            maya.mel.eval('FBXExportSplitAnimationIntoTakes -c;')
+            # maya.mel.eval('FBXExportSplitAnimationIntoTakes -c;')
         # maya.mel.eval('FBXExportSplitAnimationIntoTakes -v \"Take001\" {} {}'.format(pm.playbackOptions(q=True, ast=True), pm.playbackOptions(q=True, aet=True)))
         maya.mel.eval(("FBXExport -f \"{}\" -s;").format(exportPath))
         # pm.refresh() # Dump Maya , you Stupid AF
@@ -326,7 +326,6 @@ class Prism_Maya_Functions(object):
             fixMayaCallBug()
         except:
             pass
-        
 
     @err_catcher(name=__name__)
     def executeScript(self, origin, code, execute=False, logErr=True):
@@ -890,9 +889,8 @@ class Prism_Maya_Functions(object):
             if origin.chb_wholeScene.isChecked():
                 mel.eval('FBXExport -f "%s"' % outputName.replace("\\", "\\\\"))
             else:
-                nodes = (n for i in pm.selected() for n in i.members() if issubclass(type(n), pm.nt.Transform))
-                for node in nodes:
-                    export_anim(node, outputName)
+                # mel.eval('FBXExport -f "%s" -s' % outputName.replace("\\", "\\\\"))
+                export_anim(origin.nodes, outputName, startFrame, endFrame + 1)
         elif expType == ".abc":
             try:
                 rootString = ""

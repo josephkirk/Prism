@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="3d005041-7430-4398-86c9-5e99219a511a" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Blender/Scripts/Prism_Blender_Integration.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Blender/Scripts/Prism_Blender_Integration.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Blender/UserInterfaces/BlenderStyleSheet/Blender2.8.qss" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Blender/UserInterfaces/BlenderStyleSheet/Blender2.8.qss" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/1 Save Version.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/1 Save Version.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/2 Save Comment.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/2 Save Comment.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/3 Project Browser.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/3 Project Browser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/4 Update selected load nodes.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/4 Update selected load nodes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/5 Settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/5 Settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/PrismInit.scriptlib" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/PrismInit.scriptlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/WritePrism.setting" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/WritePrism.setting" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/open in explorer.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/open in explorer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/refresh writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Integration/refresh writer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Scripts/Prism_Fusion_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Scripts/Prism_Fusion_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Scripts/Prism_Fusion_Integration.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Scripts/Prism_Fusion_Integration.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Fusion/Scripts/Prism_Fusion_externalAccess_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Fusion/Scripts/Prism_Fusion_externalAccess_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Node_Filecache.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Node_Filecache.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Node_ImportFile.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Node_ImportFile.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Renderer_3Delight.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Renderer_3Delight.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Renderer_Redshift.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/Prism_Houdini_Renderer_Redshift.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/StateManagerNodes/hou_Export.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/StateManagerNodes/hou_Export.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/StateManagerNodes/hou_ImageRender.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/StateManagerNodes/hou_ImageRender.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/StateManagerNodes/hou_ImportFile.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Houdini/Scripts/StateManagerNodes/hou_ImportFile.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Maya/Scripts/Prism_Maya_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Maya/Scripts/Prism_Maya_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Nuke/Gizmos/WritePrism.gizmo" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Nuke/Gizmos/WritePrism.gizmo" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Nuke/Scripts/Prism_Nuke_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Nuke/Scripts/Prism_Nuke_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Photoshop/Scripts/Prism_Photoshop_Integration.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Photoshop/Scripts/Prism_Photoshop_Integration.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Apps/Standalone/Scripts/Prism_Standalone_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Apps/Standalone/Scripts/Prism_Standalone_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/Custom/Perforce/Scripts/Prism_Perforce_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/Custom/Perforce/Scripts/Prism_Perforce_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/ProjectManagers/Shotgun/Scripts/Prism_Shotgun_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/ProjectManagers/Shotgun/Scripts/Prism_Shotgun_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugins/RenderfarmManagers/Deadline/Scripts/Prism_Deadline_Functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/Plugins/RenderfarmManagers/Deadline/Scripts/Prism_Deadline_Functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismCore.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismCore.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismSettings.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismSettings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/ConfigManager.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/ConfigManager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/Decorators.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/Decorators.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/Integration.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/Integration.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/MediaManager.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/MediaManager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/MediaProducts.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/MediaProducts.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/PathManager.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/PathManager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/PluginManager.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/PluginManager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/Products.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/Products.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/ProjectEntities.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/ProjectEntities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/Projects.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/Projects.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/SanityChecks.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/SanityChecks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/PrismUtils/Updater.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/PrismUtils/Updater.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/ProjectScripts/EditShot.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/ProjectScripts/EditShot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/ProjectScripts/ProjectBrowser.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/ProjectScripts/ProjectBrowser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/ProjectScripts/StateManager.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/ProjectScripts/StateManager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/ProjectScripts/StateManagerNodes/default_ImageRender.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/ProjectScripts/StateManagerNodes/default_ImageRender.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/ProjectScripts/StateManagerNodes/default_ImportFile.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/ProjectScripts/StateManagerNodes/default_ImportFile.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/ProjectScripts/TaskSelection.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/ProjectScripts/TaskSelection.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/SetPath.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/SetPath.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/UserInterfacesPrism/PrismSettings.ui" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/UserInterfacesPrism/PrismSettings.ui" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/UserInterfacesPrism/PrismSettings_ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/UserInterfacesPrism/PrismSettings_ui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Scripts/UserInterfacesPrism/PrismSettings_ui_ps2.py" beforeDir="false" afterPath="$PROJECT_DIR$/Scripts/UserInterfacesPrism/PrismSettings_ui_ps2.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_prism.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/run_prism.ps1" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectId" id="1qXPW4cxcSW5nBWsbuG4qAIDhvI" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <created>1617222992370</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1617222992370</updated>
+      <workItem from="1617222994740" duration="5000" />
+    </task>
+    <servers />
+  </component>
+  <component name="UnityUnitTestConfiguration" currentTestLauncher="NUnit" />
+  <component name="VcsManagerConfiguration">
+    <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
+  </component>
+</project>
