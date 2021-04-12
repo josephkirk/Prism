@@ -173,7 +173,7 @@ Prism\Scripts\ProjectScripts\ProjectBrowser.py:
 
   3316          elif tab in ["ac", "sc"]:
   3317:             self.core.callback(
-  3318                  name="onCategroyDlgOpen", types=["custom"], args=[self, self.newItem]
+  3318                  name="onCategoryDlgOpen", types=["custom"], args=[self, self.newItem]
 
   4680  
   4681:         self.core.callback(
