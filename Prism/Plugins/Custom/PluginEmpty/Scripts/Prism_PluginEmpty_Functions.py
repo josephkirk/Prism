@@ -142,7 +142,7 @@ class Prism_PluginEmpty_Functions(object):
         pass
 
     @err_catcher(name=__name__)
-    def onCategroyDlgOpen(self, origin, catDialog):
+    def onCategoryDlgOpen(self, origin, catDialog):
         pass
 
     @err_catcher(name=__name__)
