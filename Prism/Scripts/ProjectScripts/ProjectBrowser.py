@@ -3326,7 +3326,7 @@ class ProjectBrowser(QMainWindow, ProjectBrowser_ui.Ui_mw_ProjectBrowser):
             )
         elif tab in ["ac", "sc"]:
             self.core.callback(
-                name="onCategroyDlgOpen", types=["custom"], args=[self, self.newItem]
+                name="onCategoryDlgOpen", types=["custom"], args=[self, self.newItem]
             )
 
         self.newItem.show()
