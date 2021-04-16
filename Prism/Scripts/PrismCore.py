@@ -2610,6 +2610,9 @@ License: GNU GPL-3.0-or-later<br>
 
         def show(self):
             self.createPopup()
+            if not self.msg:
+                logger.warning("Failed to pop up")
+                return
             self.msg.show()
             QCoreApplication.processEvents()
 

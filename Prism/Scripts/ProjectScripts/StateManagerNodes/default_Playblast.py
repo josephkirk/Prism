@@ -472,7 +472,7 @@ class PlayblastClass(object):
 
         fileName = self.core.getCurrentFileName()
 
-        result = self.getOutputName(useVersion=useVersion, extension=".jpg")
+        result = self.getOutputName(useVersion=useVersion)
         if not result:
             return [
                 self.state.text(0)
