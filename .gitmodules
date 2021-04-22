@@ -1,3 +1,0 @@
-[submodule "Prism/Plugins/ProjectManagers/Kitsu"]
-	path = Prism/Plugins/ProjectManagers/Kitsu
-	url = git@github.com:josephkirk/KitsuPrismIntergration

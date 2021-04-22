@@ -103,15 +103,20 @@ def export_anim(roots, exportPath, start_frame, end_frame, rootnode_name=None):
             if not rootnode_name and targetParent:
                 rootnode_name = targetParent.nodeName()
 
-            if rootnode_name:
-                rootnode = pm.nt.Transform(name=rootnode_name)
-                create_nodes.append(rootnode)
-                export_node = rootnode
-
             target_name = source_node_root.namespace()
             duplicated_node = source_node_root.duplicate()
             duplicated_node = duplicated_node[0]
-            duplicated_node.setParent(rootnode)
+            duplicated_node.setParent(None)
+
+            if rootnode_name:
+                if duplicated_node.getParent():
+                    duplicated_node.getParent().rename(rootnode_name)
+                    rootnode = duplicated_node.getParent()
+                else:
+                    rootnode = pm.nt.Transform(name=rootnode_name)
+                    duplicated_node.setParent(rootnode)
+                create_nodes.append(rootnode)
+                export_node = rootnode
             try:
                 duplicated_node.rename(source_node_root.nodeName())
             except:
@@ -160,18 +165,20 @@ def export_anim(roots, exportPath, start_frame, end_frame, rootnode_name=None):
         maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|UnitsSelector" -v Centimeters;')
         maya.mel.eval('FBXProperty "Export|AdvOptGrp|UnitsGrp|DynamicScaleConversion" -v true;')
         maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation" -v 1;')
-        maya.mel.eval('FBXExportBakeComplexAnimation -v 1;')
-        maya.mel.eval('FBXExportBakeResampleAnimation -v 0;')
-        maya.mel.eval('FBXExportBakeComplexStep -v 1;')
-        maya.mel.eval('FBXExportQuaternion -v quaternion;')
-        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(start_frame))
-        maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(end_frame))
+        # maya.mel.eval('FBXExportBakeComplexAnimation -v 0;')
+        # maya.mel.eval('FBXExportBakeResampleAnimation -v 0;')
+        # maya.mel.eval('FBXExportBakeComplexStep -v 0;')
+
+        # maya.mel.eval('FBXExportQuaternion -v quaternion;')
+        # maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameStart" -v {};'.format(start_frame))
+        # maya.mel.eval('FBXProperty "Export|IncludeGrp|Animation|BakeComplexAnimation|BakeFrameEnd" -v {};'.format(end_frame))
         maya.mel.eval('FBXExportConstraints -v 0;')
         maya.mel.eval('FBXExportEmbeddedTextures -v 0;')
         maya.mel.eval('FBXExportUpAxis z;')
         maya.mel.eval('FBXExportInputConnections  -v 0;')
         # maya.mel.eval('FBXExportInAscii -v 1;')
-        maya.mel.eval('FBXExportApplyConstantKeyReducer -v 0;')
+        maya.mel.eval('FBXExportApplyConstantKeyReducer -v 1;')
+        maya.mel.eval('bakeResults -simulation true -t "{}:{}" -sampleBy 1 -oversamplingRate 1 -disableImplicitControl true -preserveOutsideKeys false -sparseAnimCurveBake false -removeBakedAttributeFromLayer false -removeBakedAnimFromLayer false -bakeOnOverrideLayer false -minimizeRotation true -controlPoints false -shape true'.format(start_frame, end_frame))
         if cam_export:
             maya.mel.eval('FBXExportCameras -v 1;')
         else:

@@ -1,1 +1,9 @@
 *.pyc
+Prism/Python37/*
+Prism/PythonLibs/*
+Prism/Plugins/*
+Prism/Tools/*
+__pycache__
+*~
+.*
+*.log*
