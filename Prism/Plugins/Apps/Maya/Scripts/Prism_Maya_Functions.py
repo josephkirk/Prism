@@ -642,13 +642,14 @@ class Prism_Maya_Functions(object):
         return len(cmds.ls(handle)) > 0
 
     @err_catcher(name=__name__)
-    def getCamNodes(self, origin, cur=False):
+    def getCamNodes(self, origin, cur=False, seq=False):
         sceneCams = cmds.listRelatives(
             cmds.ls(cameras=True, long=True), parent=True, fullPath=True
         )
         if cur:
             sceneCams = ["Current View"] + sceneCams
-
+        if seq:
+            sceneCams = ["Camera Sequence"] + sceneCams
         return sceneCams
 
     @err_catcher(name=__name__)
@@ -2643,6 +2644,23 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
         origin.sp_rangeStart.setValue(frange[0])
         origin.sp_rangeEnd.setValue(frange[1])
 
+        origin.w_useCameraSequencer = QWidget()
+        origin.lo_useCameraSequencer = QHBoxLayout()
+        origin.w_useCameraSequencer.setLayout(origin.lo_useCameraSequencer)
+        origin.l_useCameraSequencer = QLabel("Use Camera Sequencer")
+        spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        origin.chb_useCameraSequencer = QCheckBox()
+        origin.chb_useCameraSequencer.setContentsMargins(9, 0, 9, 0)
+        origin.lo_useCameraSequencer.addWidget(origin.l_useCameraSequencer)
+        origin.lo_useCameraSequencer.addSpacerItem(spacer)
+        origin.lo_useCameraSequencer.addWidget(origin.chb_useCameraSequencer)
+        origin.w_useCameraSequencer.setToolTip( "Use Camera Sequencer instead of Single Camera")
+
+        origin.gb_playblast.layout().insertWidget(5, origin.w_useCameraSequencer)
+        origin.chb_useCameraSequencer.stateChanged.connect(
+            origin.stateManager.saveStatesToScene
+        )
+
         origin.w_useRecommendedSettings = QWidget()
         origin.lo_useRecommendedSettings = QHBoxLayout()
         origin.lo_useRecommendedSettings.setContentsMargins(9, 0, 9, 0)
@@ -2679,11 +2697,16 @@ Show only polygon objects in viewport.
             origin.chb_useRecommendedSettings.setChecked(
                 eval(data["useRecommendedSettings"])
             )
+        if "useCameraSequencer" in data:
+            origin.chb_useCameraSequencer.setChecked(
+                eval(data["useCameraSequencer"])
+            )
 
     @err_catcher(name=__name__)
     def sm_playblast_getStateProps(self, origin):
         stateProps = {
-            "useRecommendedSettings": str(origin.chb_useRecommendedSettings.isChecked())
+            "useRecommendedSettings": str(origin.chb_useRecommendedSettings.isChecked()),
+            "useCameraSequencer": str(origin.chb_useCameraSequencer.isChecked())
         }
 
         return stateProps
@@ -2763,6 +2786,8 @@ Show only polygon objects in viewport.
             'cmds.playblast( startTime=%s, endTime=%s, format="%s", percent=100, viewer=False, forceOverwrite=True, offScreen=True, showOrnaments=False, filename="%s", sound="%s"'
             % (jobFrames[0], jobFrames[1], fmt, outputName.replace("\\", "\\\\"), soundNode)
         )
+
+        cmdString += ", sequenceTime={}".format(origin.chb_useCameraSequencer.isChecked())
 
         if origin.chb_resOverride.isChecked():
             cmdString += ", width=%s, height=%s" % (
