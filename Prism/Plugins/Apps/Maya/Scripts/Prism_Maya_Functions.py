@@ -31,6 +31,7 @@
 # along with Prism.  If not, see <https://www.gnu.org/licenses/>.
 
 
+from genericpath import exists
 import os
 import sys
 import traceback
@@ -176,8 +177,8 @@ def export_anim(roots, exportPath, start_frame, end_frame, rootnode_name=None):
         maya.mel.eval('FBXExportEmbeddedTextures -v 0;')
         maya.mel.eval('FBXExportUpAxis z;')
         maya.mel.eval('FBXExportInputConnections  -v 0;')
-        maya.mel.eval('FBXExportInAscii -v 1;')
-        maya.mel.eval('FBXExportApplyConstantKeyReducer -v 1;')
+        maya.mel.eval('FBXExportInAscii -v 0;')
+        maya.mel.eval('FBXExportApplyConstantKeyReducer -v 0;')
         maya.mel.eval('bakeResults -simulation true -t "{}:{}" -sampleBy 1 -oversamplingRate 2 -disableImplicitControl true -preserveOutsideKeys false -sparseAnimCurveBake false -removeBakedAttributeFromLayer false -removeBakedAnimFromLayer false -bakeOnOverrideLayer false -minimizeRotation true -controlPoints false -shape true'.format(start_frame, end_frame))
         if cam_export:
             maya.mel.eval('FBXExportCameras -v 1;')
@@ -2646,11 +2647,11 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
 
         origin.w_useCameraSequencer = QWidget()
         origin.lo_useCameraSequencer = QHBoxLayout()
+        origin.lo_useCameraSequencer.setContentsMargins(9, 0, 9, 0)
         origin.w_useCameraSequencer.setLayout(origin.lo_useCameraSequencer)
         origin.l_useCameraSequencer = QLabel("Use Camera Sequencer")
         spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Expanding)
         origin.chb_useCameraSequencer = QCheckBox()
-        origin.chb_useCameraSequencer.setContentsMargins(9, 0, 9, 0)
         origin.lo_useCameraSequencer.addWidget(origin.l_useCameraSequencer)
         origin.lo_useCameraSequencer.addSpacerItem(spacer)
         origin.lo_useCameraSequencer.addWidget(origin.chb_useCameraSequencer)
@@ -2658,6 +2659,46 @@ tabLayout -e -sti %s $tabLayout;""" % tabNum
 
         origin.gb_playblast.layout().insertWidget(5, origin.w_useCameraSequencer)
         origin.chb_useCameraSequencer.stateChanged.connect(
+            origin.stateManager.saveStatesToScene
+        )
+
+        origin.w_playblastEachShot = QWidget()
+        origin.lo_playblastEachShot = QHBoxLayout()
+        origin.lo_playblastEachShot.setContentsMargins(9, 0, 9, 0)
+        origin.w_playblastEachShot.setLayout(origin.lo_playblastEachShot)
+        origin.l_playblastEachShot = QLabel("Playblast each shot")
+        spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        origin.chb_playblastEachShot = QCheckBox()
+        origin.chb_playblastEachShotExclusive = QCheckBox("Exclusive")
+        origin.lo_playblastEachShot.addWidget(origin.l_playblastEachShot)
+        origin.lo_playblastEachShot.addSpacerItem(spacer)
+        origin.lo_playblastEachShot.addWidget(origin.chb_playblastEachShot)
+        origin.lo_playblastEachShot.addWidget(origin.chb_playblastEachShotExclusive)
+        origin.w_playblastEachShot.setToolTip( "Playblast Individual Shot")
+
+        origin.gb_playblast.layout().insertWidget(6, origin.w_playblastEachShot)
+        origin.chb_useCameraSequencer.toggled.connect(
+            origin.w_playblastEachShot.setEnabled
+        )
+        # origin.chb_useCameraSequencer.toggled.connect(
+        #     origin.chb_playblastEachShot.setChecked
+        # )
+        origin.w_playblastEachShot.setEnabled(False)
+
+        origin.w_useOrnament = QWidget()
+        origin.lo_useOrnament = QHBoxLayout()
+        origin.lo_useOrnament.setContentsMargins(9, 0, 9, 0)
+        origin.w_useOrnament.setLayout(origin.lo_useOrnament)
+        origin.l_useOrnament = QLabel("Use Ornament")
+        spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        origin.chb_useOrnament = QCheckBox()
+        origin.lo_useOrnament.addWidget(origin.l_useOrnament)
+        origin.lo_useOrnament.addSpacerItem(spacer)
+        origin.lo_useOrnament.addWidget(origin.chb_useOrnament)
+        origin.w_useOrnament.setToolTip( "Turn on Maya Ornament")
+
+        origin.gb_playblast.layout().insertWidget(5, origin.w_useOrnament)
+        origin.chb_useOrnament.stateChanged.connect(
             origin.stateManager.saveStatesToScene
         )
 
@@ -2701,12 +2742,19 @@ Show only polygon objects in viewport.
             origin.chb_useCameraSequencer.setChecked(
                 eval(data["useCameraSequencer"])
             )
+            origin.w_playblastEachShot.setEnabled(origin.chb_useCameraSequencer.isChecked())
+            # origin.chb_playblastEachShot.setChecked(origin.chb_useCameraSequencer.isChecked())
+        if "useOrnament" in data:
+            origin.chb_useOrnament.setChecked(
+                eval(data["useOrnament"])
+            )
 
     @err_catcher(name=__name__)
     def sm_playblast_getStateProps(self, origin):
         stateProps = {
             "useRecommendedSettings": str(origin.chb_useRecommendedSettings.isChecked()),
-            "useCameraSequencer": str(origin.chb_useCameraSequencer.isChecked())
+            "useCameraSequencer": str(origin.chb_useCameraSequencer.isChecked()),
+            "useOrnament": str(origin.chb_useOrnament.isChecked())
         }
 
         return stateProps
@@ -2783,11 +2831,108 @@ Show only polygon objects in viewport.
         soundNode = cmds.timeControl(aPlayBackSliderPython, query=True, sound=True)
 
         cmdString = (
-            'cmds.playblast( startTime=%s, endTime=%s, format="%s", percent=100, viewer=False, forceOverwrite=True, offScreen=True, showOrnaments=False, filename="%s", sound="%s"'
-            % (jobFrames[0], jobFrames[1], fmt, outputName.replace("\\", "\\\\"), soundNode)
+            'cmds.playblast( startTime=%s, endTime=%s, format="%s", percent=100, viewer=False, forceOverwrite=True, offScreen=True, showOrnaments=%s, filename="%s", sound="%s"'
+            % (jobFrames[0], jobFrames[1], fmt, origin.chb_useOrnament.isChecked(),  outputName.replace("\\", "\\\\"), soundNode)
         )
 
-        cmdString += ", sequenceTime={}".format(origin.chb_useCameraSequencer.isChecked())
+        format_dict = {"qt": ".mov"}
+        if origin.chb_useCameraSequencer.isChecked():
+            cmdString += ", sequenceTime={}".format(origin.chb_useCameraSequencer.isChecked())
+            if origin.chb_playblastEachShot.isChecked():
+                shots = cmds.ls(type="shot")
+                import maya
+                result = {}
+                default_playlistformat = cmds.optionVar(q="playblastFormat")
+                for shot in shots:
+                    if cmds.shot(shot, mute=True, q=True):
+                        continue
+                    start_time = cmds.shot(shot, sst=1, q=1)
+                    end_time = cmds.shot(shot, set=1, q=1)
+                    # print(start_time, end_time, jobFrames)
+                    if origin.chb_playblastEachShotExclusive.isChecked():
+                        if start_time > jobFrames[1]:
+                            break
+                        if end_time < jobFrames[0]:
+                            continue
+                    else:
+                        if not ((jobFrames[0] <= start_time < jobFrames[1]) and (jobFrames[0] < end_time <= jobFrames[1])):
+                            continue
+                    shotcam = cmds.shot(shot, cc=True, q=True)
+                    if "shotcams" not in self.pbSceneSettings:
+                        self.pbSceneSettings["shotcams"] = {}
+                    self.pbSceneSettings["shotcams"][shotcam] = {
+                        ".filmFit": cmds.getAttr(shotcam + ".filmFit"),
+                        ".displayFilmGate": cmds.getAttr(shotcam + ".displayFilmGate"),
+                        ".displayResolution": cmds.getAttr(shotcam + ".displayResolution"),
+                        ".overscan": cmds.getAttr(shotcam + ".overscan")
+                    }
+
+                    try:
+                        cmds.setAttr(shotcam + ".filmFit", self.playblastSettings["filmFit"])
+                    except:
+                        pass
+
+                    try:
+                        cmds.setAttr(shotcam + ".displayFilmGate", self.playblastSettings["displayFilmGate"])
+                    except:
+                        pass
+
+                    try:
+                        cmds.setAttr(shotcam + ".displayResolution", self.playblastSettings["displayResolution"])
+                    except:
+                        pass
+
+                    try:
+                        cmds.setAttr(shotcam + ".overscan", self.playblastSettings["overscan"])
+                    except:
+                        pass
+
+
+                    # shot_path = os.path.join(
+                    #     cmds.workspace(expandName=maya.mel.eval("getDefaultPlayblastDirectory()")),
+                    #     shot + format_dict.get(default_playlistformat, "."+default_playlistformat),
+                    # )
+                    # if not os.path.exists(shot_path):
+                    # cmds.optionVar(iv=("playblastSequenceShowOrnaments", origin.chb_useOrnament.isChecked()))
+                    # maya.mel.eval('performPlayblastShot(0, "' + shot + '")')
+                    shotName = cmds.shot(shot, shotName=True, q=True)
+                    output_shotdir = os.path.join(os.path.dirname(os.path.normpath(outputName)), "shots")
+                    global_output_shotdir = os.path.join(os.path.dirname( self.core.convertPath(os.path.normpath(outputName), "global")), "shots")
+                    if not os.path.exists(output_shotdir):
+                        os.makedirs(output_shotdir)
+                    ext = os.path.splitext(outputName)[-1]
+                    output_filename = shotName + "_{}-{}".format(int(start_time), int(end_time)) + ext
+                    output_shotpath = os.path.join(output_shotdir, output_filename)
+                    global_output_shotpath = os.path.join(global_output_shotdir, output_filename)
+                    shot_cmdString = (
+                        'cmds.playblast( startTime=%s, endTime=%s, format="%s", sequenceTime=True, percent=100, viewer=False, forceOverwrite=True, offScreen=True, showOrnaments=%s, filename="%s"'
+                        % (start_time, end_time, fmt, origin.chb_useOrnament.isChecked(), output_shotpath.replace("\\", "\\\\"))
+                    )
+                    if origin.chb_resOverride.isChecked():
+                        shot_cmdString += ", width=%s, height=%s" % (
+                            origin.sp_resWidth.value(),
+                            origin.sp_resHeight.value(),
+                        )
+                    else:
+                        if origin.cb_formats.currentText() == ".mp4":
+                            res = self.getViewportResolution()
+                            if not self.isViewportResolutionEven(res):
+                                evenRes = self.getEvenViewportResolution(res)
+                                shot_cmdString += ", width=%s, height=%s" % (
+                                    evenRes["width"],
+                                    evenRes["height"],
+                                )
+                                logger.debug("using even resolution to be able to convert to mp4")
+
+                    shot_cmdString += ")"
+                    print(shot_cmdString)
+                    self.executeScript(origin, shot_cmdString, logErr=False)
+                    print(global_output_shotpath, output_shotpath)
+                    if global_output_shotpath != output_shotpath:
+                        try:
+                            shutil.copyfile(output_shotpath, global_output_shotpath)
+                        except Exception as why:
+                            logger.error("Failed to copy {} to {}".format(output_shotpath, global_output_shotpath))
 
         if origin.chb_resOverride.isChecked():
             cmdString += ", width=%s, height=%s" % (
@@ -2912,6 +3057,15 @@ Show only polygon objects in viewport.
                 mel.eval(self.pbSceneSettings["visObjects"])
             except:
                 pass
+        for camname, camsetting in self.pbSceneSettings.get("shotcams", {}).items():
+            for key, value in camsetting.items():
+                try:
+                    cmds.setAttr(
+                        camname + key,
+                        value,
+                    )
+                except:
+                    pass
 
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):

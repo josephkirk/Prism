@@ -2290,6 +2290,24 @@ License: GNU GPL-3.0-or-later<br>
         return pythonPath
 
     @err_catcher(name=__name__)
+    def sendToTaiga(self, text, subject="Prism Error", attachment=None):
+        from taiga import TaigaAPI
+        import datetime
+        api = TaigaAPI(host='http://taiga.virtuos-sparx.com')
+        api.auth(username="bot@bot.com", password="2021@Virtuos")
+        project = api.projects.get_by_slug('josephkirk-adaptable-game-cinematic-pipeline')
+        newissue = project.add_issue(
+            "{}: {}-{}-{}".format(subject, os.getenv("USERNAME"), os.getenv("COMPUTERNAME"), datetime.datetime.now().strftime("%d/%m/%Y-%H:%M:%S")),
+            project.priorities.get(name='High').id,
+            project.issue_statuses.get(name='New').id,
+            project.issue_types.get(name='Bug').id,
+            project.severities.get(name='Normal').id,
+            description=text
+        )
+        if attachment:
+            newissue.attach(attachment)
+
+    @err_catcher(name=__name__)
     def sendEmail(self, text, subject="Prism Error", quiet=False, attachment=None):
         if not quiet:
             waitmsg = QMessageBox(
@@ -2303,7 +2321,15 @@ License: GNU GPL-3.0-or-later<br>
                 i.setVisible(False)
             waitmsg.show()
             QCoreApplication.processEvents()
-
+        try:
+            self.sendToTaiga(text, subject, attachment)
+            return
+        except Exception as why:
+            print(why)
+            return
+        finally:
+            if not quiet and "waitmsg" in locals() and waitmsg.isVisible():
+                waitmsg.close()
         try:
             pythonPath = self.getPythonPath()
             attachment = attachment or ""
