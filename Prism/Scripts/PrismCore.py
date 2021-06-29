@@ -2293,11 +2293,22 @@ License: GNU GPL-3.0-or-later<br>
     def sendToTaiga(self, text, subject="Prism Error", attachment=None):
         from taiga import TaigaAPI
         import datetime
+        from hashlib import md5
+        if not text:
+            return
+        hash = md5(text.encode())
+        hexid = hash.hexdigest()
         api = TaigaAPI(host='http://taiga.virtuos-sparx.com')
         api.auth(username="bot@bot.com", password="2021@Virtuos")
         project = api.projects.get_by_slug('josephkirk-adaptable-game-cinematic-pipeline')
+        # Check for issue with same content
+        for issue in project.list_issues():
+            issue_id = issue.subject.split("-")[-1]
+            if issue_id == hexid:
+                return
         newissue = project.add_issue(
-            "{}: {}-{}-{}".format(subject, os.getenv("USERNAME"), os.getenv("COMPUTERNAME"), datetime.datetime.now().strftime("%d/%m/%Y-%H:%M:%S")),
+            "{}: {}-{}-{}-{}".format(
+                subject, os.getenv("USERNAME"), os.getenv("COMPUTERNAME"), datetime.datetime.now().strftime("%d/%m/%Y-%H:%M:%S"), hexid),
             project.priorities.get(name='High').id,
             project.issue_statuses.get(name='New').id,
             project.issue_types.get(name='Bug').id,
